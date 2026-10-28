@@ -11,12 +11,15 @@ const TABLES = [
   "week_plans",
   "plan_candidates",
   "plan_items",
+  "log_entries",
+  "profile",
 ] as const;
 
 // Column defaults the database fills in on insert.
 const DEFAULTS: Partial<Record<(typeof TABLES)[number], Row>> = {
   week_plans: { cuisines: [], status: "draft" },
   plan_candidates: { selected: false },
+  log_entries: { status: "planned", portion: 1 },
 };
 
 // An in-memory stand-in for the recipe tables (and the tables recipe search

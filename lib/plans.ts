@@ -7,6 +7,7 @@ import type {
   Database,
   MealSlot,
   PlanCandidateRow,
+  PlanItemRow,
   PlanStatus,
   RecipeRow,
   WeekPlanRow,
@@ -20,6 +21,7 @@ import {
 } from "@/lib/recipeSearch";
 import type { BraveClient } from "@/lib/services/braveSearch";
 import type { RecipePage } from "@/lib/services/recipePage";
+import { dailyTotals, scalePortions } from "@/lib/scaling";
 import { MEAL_SLOTS, pickCuisine, type NewWeekInput } from "@/lib/weeks";
 
 type Supabase = SupabaseClient<Database>;
@@ -72,12 +74,22 @@ export type CandidateView = {
   recipe: RecipeSummary;
 };
 
+export type PlanItemView = {
+  id: number;
+  slot: MealSlot;
+  servingsPerDay: number;
+  recipe: RecipeSummary;
+};
+
 export type WeekView = {
   id: number;
   weekStart: string;
   cuisines: string[];
   status: PlanStatus;
   candidates: Record<MealSlot, CandidateView[]>;
+  // The finalized week's recipes and servings per day, in slot order; empty
+  // while the week is a draft.
+  items: PlanItemView[];
 };
 
 function num(v: number | null): number | null {
@@ -150,13 +162,40 @@ async function weekView(supabase: Supabase, week: WeekPlanRow) {
       .select("*")
       .eq("week_plan_id", week.id),
   );
+  const itemRows = rows(
+    await supabase.from("plan_items").select("*").eq("week_plan_id", week.id),
+  );
   return {
     id: week.id,
     weekStart: week.week_start,
     cuisines: week.cuisines,
     status: week.status,
     candidates: await candidateViews(supabase, candidateRows),
+    items: await itemViews(supabase, itemRows),
   } satisfies WeekView;
+}
+
+async function itemViews(
+  supabase: Supabase,
+  items: PlanItemRow[],
+): Promise<PlanItemView[]> {
+  // The same recipe views as candidates, so one query path serves both.
+  const asCandidates = items.map((i) => ({
+    ...i,
+    rank: 1,
+    selected: true,
+  }));
+  const grouped = await candidateViews(supabase, asCandidates);
+  return MEAL_SLOTS.flatMap((slot) =>
+    grouped[slot].map((c) => ({
+      id: c.id,
+      slot,
+      servingsPerDay: Number(
+        items.find((i) => i.id === c.id)!.servings_per_day,
+      ),
+      recipe: c.recipe,
+    })),
+  );
 }
 
 // The week starting on `weekStart`, or null when it hasn't been started.
@@ -410,4 +449,116 @@ export async function loadRecipe(
       ? recipe.steps.filter((s): s is string => typeof s === "string")
       : [],
   };
+}
+
+// The 7 dates of the week starting on `weekStart`, Sunday to Saturday.
+export function weekDates(weekStart: string): string[] {
+  return Array.from({ length: 7 }, (_, i) => {
+    const d = new Date(`${weekStart}T00:00:00Z`);
+    d.setUTCDate(d.getUTCDate() + i);
+    return d.toISOString().slice(0, 10);
+  });
+}
+
+// US-11, TR-12, TR-18: turns the week's picks into the plan. Each slot's
+// recipe gets its servings per day, and every day Sunday to Saturday gets a
+// planned log entry per slot. The week is then final.
+export async function finalizeWeek(
+  supabase: Supabase,
+  weekId: number,
+  targets: { kcal: number; proteinG: number },
+): Promise<WeekView> {
+  const week = await weekById(supabase, weekId);
+  assertDraft(week);
+
+  const picks = rows(
+    await supabase
+      .from("plan_candidates")
+      .select("*")
+      .eq("week_plan_id", week.id)
+      .eq("selected", true),
+  );
+  const unpicked = MEAL_SLOTS.filter((s) => !picks.some((p) => p.slot === s));
+  if (unpicked.length > 0) {
+    throw new PlanError(`Pick a recipe for ${unpicked.join(", ")} first`, 409);
+  }
+  const recipes = rows(
+    await supabase
+      .from("recipes")
+      .select("*")
+      .in(
+        "id",
+        picks.map((p) => p.recipe_id),
+      ),
+  );
+  const scaled = scalePortions(
+    MEAL_SLOTS.map((slot) => {
+      const pick = picks.find((p) => p.slot === slot)!;
+      const recipe = recipes.find((r) => r.id === pick.recipe_id);
+      if (!recipe) throw new PlanError(`The ${slot} recipe is missing`, 409);
+      return {
+        slot,
+        recipeId: recipe.id,
+        kcal: Number(recipe.kcal ?? 0),
+        proteinG: Number(recipe.protein_g ?? 0),
+        carbsG: Number(recipe.carbs_g ?? 0),
+        fatG: Number(recipe.fat_g ?? 0),
+      };
+    }),
+    targets,
+  );
+
+  check(
+    await supabase.from("plan_items").insert(
+      scaled.map((i) => ({
+        week_plan_id: week.id,
+        slot: i.slot,
+        recipe_id: i.recipeId,
+        servings_per_day: i.servingsPerDay,
+      })),
+    ),
+  );
+  const items = rows(
+    await supabase.from("plan_items").select("*").eq("week_plan_id", week.id),
+  );
+  try {
+    const entries = weekDates(week.week_start).flatMap((date) =>
+      items.map((item) => ({
+        date,
+        slot: item.slot,
+        kind: "planned" as const,
+        plan_item_id: item.id,
+        portion: Number(item.servings_per_day),
+      })),
+    );
+    check(await supabase.from("log_entries").insert(entries));
+    check(
+      await supabase
+        .from("week_plans")
+        .update({ status: "final" })
+        .eq("id", week.id),
+    );
+  } catch (err) {
+    // Leave the week as a draft with no half-written plan.
+    const ids = items.map((i) => i.id);
+    await supabase.from("log_entries").delete().in("plan_item_id", ids);
+    await supabase.from("plan_items").delete().eq("week_plan_id", week.id);
+    throw err;
+  }
+  return weekView(supabase, { ...week, status: "final" });
+}
+
+// A finalized week's totals for one day, from its items' servings per day.
+export function planDailyTotals(items: readonly PlanItemView[]) {
+  return dailyTotals(
+    items.map((i) => ({
+      slot: i.slot,
+      recipeId: i.recipe.id,
+      kcal: i.recipe.kcal ?? 0,
+      proteinG: i.recipe.proteinG ?? 0,
+      carbsG: i.recipe.carbsG ?? 0,
+      fatG: i.recipe.fatG ?? 0,
+      servingsPerDay: i.servingsPerDay,
+    })),
+  );
 }
