@@ -23,7 +23,7 @@ Status: ☐ not started · ◐ in progress · ☑ done and validated
 
 **Done when:** the app runs locally, CI is green on `main`.
 
-### ◐ Step 2. Database
+### ☑ Step 2. Database
 1. 🧑 Create a free Supabase project and share the URL and keys as environment variables (never committed).
 2. Add `supabase/migrations/001_schema.sql` with every enum and table from the architecture doc.
 3. Add row-level security policies (`user_id = auth.uid()`) to every table.
@@ -31,7 +31,7 @@ Status: ☐ not started · ◐ in progress · ☑ done and validated
 
 **Done when:** the migration applies cleanly and the types compile.
 
-### ☐ Step 3. Google sign-in (US-1, US-2, TR-4, TR-5)
+### ◐ Step 3. Google sign-in (US-1, US-2, TR-4, TR-5)
 1. 🧑 Create Google OAuth credentials and enable the Google provider in Supabase.
 2. Sign-in page and sign-out button.
 3. Middleware: unauthenticated users go to sign-in; any email other than `ALLOWED_EMAIL` is signed out and refused.
