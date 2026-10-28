@@ -10,6 +10,7 @@ const week = await import("@/app/api/weeks/[week]/route");
 const candidates = await import("@/app/api/weeks/[week]/candidates/route");
 const candidate = await import("@/app/api/candidates/[id]/route");
 const recipe = await import("@/app/api/recipes/[id]/route");
+const finalize = await import("@/app/api/weeks/[week]/finalize/route");
 
 function signedIn(seed: Parameters<typeof fakeRecipeTables>[0] = {}) {
   const db = fakeRecipeTables(seed);
@@ -179,5 +180,60 @@ describe("GET /api/recipes/:id", () => {
     signedIn();
     const res = await recipe.GET(request("GET"), params({ id: "3" }));
     expect(res.status).toBe(404);
+  });
+});
+
+describe("POST /api/weeks/:id/finalize", () => {
+  const picks = ["breakfast", "lunch", "dinner", "snack"].map((slot, i) => ({
+    id: i + 1,
+    week_plan_id: 1,
+    slot,
+    recipe_id: i + 1,
+    rank: 1,
+    selected: true,
+  }));
+  const recipes = [1, 2, 3, 4].map((id) => ({
+    id,
+    title: `Recipe ${id}`,
+    servings: 2,
+    kcal: 300 + id * 100,
+    protein_g: 30,
+    carbs_g: 40,
+    fat_g: 15,
+  }));
+  const week1 = { id: 1, week_start: "2026-11-01", status: "draft" };
+
+  it("needs a saved profile for the targets", async () => {
+    signedIn({
+      seed: { week_plans: [week1], plan_candidates: picks, recipes },
+    });
+    const res = await finalize.POST(request("POST"), params({ week: "1" }));
+    expect(res.status).toBe(409);
+  });
+
+  it("finalizes the week", async () => {
+    const db = signedIn({
+      seed: {
+        week_plans: [week1],
+        plan_candidates: picks,
+        recipes,
+        profile: [
+          {
+            age: 25,
+            sex: "male",
+            height_in: 70,
+            weight_lb: 160,
+            activity_level: "light",
+            surplus_kcal: 300,
+          },
+        ],
+      },
+    });
+    const res = await finalize.POST(request("POST"), params({ week: "1" }));
+    expect(res.status).toBe(200);
+    const { week: finalized } = await res.json();
+    expect(finalized.status).toBe("final");
+    expect(finalized.items).toHaveLength(4);
+    expect(db.table("log_entries")).toHaveLength(28);
   });
 });
