@@ -166,7 +166,7 @@ Status: ☐ not started · ◐ in progress · ☑ done and validated
 
 **Done when:** only confirmed items count toward totals.
 
-### ◐ Step 19. Eating out, manual (US-24, US-25)
+### ☑ Step 19. Eating out, manual (US-24, US-25)
 1. `POST /api/log/restaurant`: marks the planned entry skipped and adds a restaurant entry, confirmed. Its calories and macros are for the whole item; the amount eaten is its portion.
 2. Form on the Today page: restaurant, item, amount eaten, calories, protein, carbs, fat.
 3. `DELETE /api/log/:id` removes a restaurant entry and puts the planned meal back to planned. While a slot has an eat-out, its planned meal stays skipped (no undo or confirm), so the two never both count.
@@ -176,7 +176,7 @@ Status: ☐ not started · ◐ in progress · ☑ done and validated
 
 ## Phase 7: Launch
 
-### ☐ Step 20. Deploy
+### ◐ Step 20. Deploy
 1. 🧑 Connect the repo to a free Vercel project and add the environment variables.
 2. Update Supabase and Google OAuth redirect URLs for the Vercel domain.
 3. Playwright smoke test of the full flow: sign in, profile, build and finalize a week, shopping list, confirm a meal, log a weight.
