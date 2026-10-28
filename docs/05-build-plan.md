@@ -48,13 +48,13 @@ Status: ☐ not started · ◐ in progress · ☑ done and validated
 
 ## Phase 2: Profile, targets and weight
 
-### ◐ Step 5. Targets logic (US-5, TR-10, TR-20)
+### ☑ Step 5. Targets logic (US-5, TR-10, TR-20)
 1. `lib/units.ts`: lb↔kg, ft/in↔cm, and cooking unit conversions, with tests.
 2. `lib/targets.ts`: BMR, TDEE, +300 surplus, protein, fat and carbs, with tests against worked examples.
 
 **Done when:** tests pass for male and female examples at each activity level.
 
-### ☐ Step 6. Profile (US-4, US-6)
+### ◐ Step 6. Profile (US-4, US-6)
 1. `GET/PUT /api/profile` and `GET /api/targets`.
 2. Profile page: form for age, sex, height, weight, activity; shows the targets.
 
