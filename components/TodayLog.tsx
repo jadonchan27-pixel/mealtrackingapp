@@ -189,7 +189,11 @@ export function TodayLog({
         />
       ) : (
         <p>
-          <button type="button" onClick={() => setEatOut("any")}>
+          <button
+            type="button"
+            className="eat-out-button"
+            onClick={() => setEatOut("any")}
+          >
             Log eating out
           </button>
         </p>
