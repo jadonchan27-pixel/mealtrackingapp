@@ -6,16 +6,17 @@ The app runs on a free Vercel Hobby project. Steps marked 🧑 are done by Jadon
 
 1. Sign in at [vercel.com](https://vercel.com) with GitHub and choose **Add New → Project**.
 2. Import `jadonchan27-pixel/mealtrackingapp`. Vercel detects Next.js, so leave the build settings as they are.
-3. Before the first deploy, open **Environment Variables** and add these six, copying each value from `.env.local` on the PC:
+3. Before the first deploy, open **Environment Variables** and add these, copying each value from `.env.local` on the PC:
 
    | Name | Where it comes from |
    |---|---|
    | `NEXT_PUBLIC_SUPABASE_URL` | Supabase: Project Settings → API |
    | `NEXT_PUBLIC_SUPABASE_ANON_KEY` | Supabase: Project Settings → API |
-   | `SUPABASE_SERVICE_ROLE_KEY` | Supabase: Project Settings → API (keep secret) |
    | `ALLOWED_EMAIL` | The one Google account allowed to sign in |
    | `USDA_API_KEY` | `.env.local` |
    | `BRAVE_API_KEY` | `.env.local` |
+
+   `SUPABASE_SERVICE_ROLE_KEY` is not needed. No route uses it yet, so leave it out.
 
 4. Choose **Deploy**. When it finishes, note the domain, for example `mealtrackingapp.vercel.app`.
 
@@ -27,7 +28,9 @@ Sign-in sends the browser back to `<site>/auth/callback`, and Supabase only allo
 
 1. Supabase → **Authentication → URL Configuration**.
 2. Set **Site URL** to `https://<your-domain>.vercel.app`.
-3. Under **Redirect URLs**, add `https://<your-domain>.vercel.app/auth/callback`. Keep `http://localhost:3000/auth/callback` so local development still works.
+3. Under **Redirect URLs**, add `https://<your-domain>.vercel.app/auth/callback`. Also add `http://localhost:3000/auth/callback` if it isn't already there, so local development still works.
+
+Sign-in works only on the main Vercel address. Preview deploys (the per-branch `…-git-….vercel.app` addresses) aren't on the list, so use the main address for testing.
 
 Google needs no change. Its authorized redirect URI is Supabase's own callback (`https://<project>.supabase.co/auth/v1/callback`), which stays the same.
 
@@ -44,7 +47,7 @@ npm run smoke:login -- https://<your-domain>.vercel.app
 npm run smoke -- https://<your-domain>.vercel.app
 ```
 
-`smoke:login` opens a browser window. Sign in with Google yourself; the script saves the session to `e2e/.auth.json` (gitignored) and never sees the password. Run it again if the smoke test says it was sent to sign-in.
+`smoke:login` opens a Google Chrome window (Chrome must be installed). Sign in with Google yourself; the script saves the session to `e2e/.auth.json` (gitignored) and never sees the password. Run it again if the smoke test says it was sent to sign-in.
 
 ### 🧑 By hand, on the live site
 

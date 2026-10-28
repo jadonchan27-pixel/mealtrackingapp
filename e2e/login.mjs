@@ -8,7 +8,8 @@
 import { chromium } from "playwright";
 
 const base = process.argv[2] ?? "http://localhost:3000";
-const browser = await chromium.launch({ headless: false });
+// The installed Chrome: Google refuses sign-in in Playwright's own browser.
+const browser = await chromium.launch({ channel: "chrome", headless: false });
 const context = await browser.newContext();
 const page = await context.newPage();
 await page.goto(new URL("/sign-in", base).href);
