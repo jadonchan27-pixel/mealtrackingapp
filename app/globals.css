@@ -567,3 +567,8 @@ button:disabled {
     grid-template-columns: repeat(4, minmax(0, 1fr));
   }
 }
+
+.field-hint {
+  margin: 0;
+  font-size: 0.875rem;
+}

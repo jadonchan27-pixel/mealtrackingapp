@@ -20,6 +20,8 @@ export type FormValues = {
   inches: string;
   weightLb: string;
   activityLevel: ActivityLevel | "";
+  minIngredients: string;
+  maxIngredients: string;
 };
 
 export function toFormValues(profile: Profile | null): FormValues {
@@ -31,6 +33,8 @@ export function toFormValues(profile: Profile | null): FormValues {
       inches: "",
       weightLb: "",
       activityLevel: "",
+      minIngredients: "",
+      maxIngredients: "",
     };
   }
   const { feet, inches } = inFtIn(profile.heightIn);
@@ -41,6 +45,10 @@ export function toFormValues(profile: Profile | null): FormValues {
     inches: String(inches),
     weightLb: String(profile.weightLb),
     activityLevel: profile.activityLevel,
+    minIngredients:
+      profile.minIngredients === null ? "" : String(profile.minIngredients),
+    maxIngredients:
+      profile.maxIngredients === null ? "" : String(profile.maxIngredients),
   };
 }
 
@@ -61,7 +69,14 @@ export function toRequestBody(values: FormValues) {
     heightIn: ftInToIn(feet, inches),
     weightLb: toNumber(values.weightLb),
     activityLevel: values.activityLevel,
+    // Blank means no limit.
+    minIngredients: toLimit(values.minIngredients),
+    maxIngredients: toLimit(values.maxIngredients),
   };
+}
+
+function toLimit(text: string): number | null {
+  return text.trim() === "" ? null : Number(text);
 }
 
 function toNumber(text: string): number {
@@ -211,6 +226,40 @@ export function ProfileForm({
             ))}
           </select>
         </Field>
+
+        <div className="field">
+          <label htmlFor="min-ingredients">Ingredients per dish</label>
+          <div className="inline-inputs">
+            <input
+              id="min-ingredients"
+              inputMode="numeric"
+              placeholder="any"
+              aria-label="Fewest ingredients"
+              value={values.minIngredients}
+              onChange={(e) => set("minIngredients", e.target.value)}
+              aria-invalid={!!errors.minIngredients}
+            />
+            <span>to</span>
+            <input
+              id="max-ingredients"
+              inputMode="numeric"
+              placeholder="any"
+              aria-label="Most ingredients"
+              value={values.maxIngredients}
+              onChange={(e) => set("maxIngredients", e.target.value)}
+              aria-invalid={!!errors.maxIngredients}
+            />
+          </div>
+          <p className="muted field-hint">
+            Recipe search only offers dishes in this range. Salt, pepper,
+            cooking oil and water don&apos;t count. Leave blank for no limit.
+          </p>
+          {(errors.minIngredients || errors.maxIngredients) && (
+            <p className="field-error">
+              {errors.minIngredients ?? errors.maxIngredients}
+            </p>
+          )}
+        </div>
 
         <div className="form-actions">
           <button

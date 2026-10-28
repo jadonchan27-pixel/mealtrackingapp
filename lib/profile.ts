@@ -10,6 +10,9 @@ export type Profile = {
   heightIn: number;
   weightLb: number;
   activityLevel: ActivityLevel;
+  // US-28: ingredients a dish may need, pantry staples left out; null = no limit.
+  minIngredients: number | null;
+  maxIngredients: number | null;
 };
 
 export const ACTIVITY_LEVELS = Object.keys(
@@ -29,6 +32,7 @@ export const LIMITS = {
   age: { min: 13, max: 120 },
   heightIn: { min: 36, max: 96 },
   weightLb: { min: 50, max: 1000 },
+  ingredients: { min: 1, max: 30 },
 } as const;
 
 export type ProfileErrors = Partial<Record<keyof Profile, string>>;
@@ -75,6 +79,32 @@ export function parseProfile(body: unknown): ParseResult {
     errors.activityLevel = "Choose an activity level.";
   }
 
+  // Optional; blank (null or missing) means no limit.
+  const ingredientLimit = (key: "minIngredients" | "maxIngredients") => {
+    const v = input[key];
+    if (v === null || v === undefined) return null;
+    if (
+      typeof v !== "number" ||
+      !Number.isInteger(v) ||
+      v < LIMITS.ingredients.min ||
+      v > LIMITS.ingredients.max
+    ) {
+      errors[key] =
+        `Use a whole number from ${LIMITS.ingredients.min} to ${LIMITS.ingredients.max}, or leave it blank.`;
+      return null;
+    }
+    return v;
+  };
+  const minIngredients = ingredientLimit("minIngredients");
+  const maxIngredients = ingredientLimit("maxIngredients");
+  if (
+    minIngredients !== null &&
+    maxIngredients !== null &&
+    minIngredients > maxIngredients
+  ) {
+    errors.maxIngredients = "The most can't be less than the fewest.";
+  }
+
   if (Object.keys(errors).length > 0) {
     return { ok: false, errors };
   }
@@ -86,6 +116,8 @@ export function parseProfile(body: unknown): ParseResult {
       heightIn: heightIn as number,
       weightLb: weightLb as number,
       activityLevel: activityLevel as ActivityLevel,
+      minIngredients,
+      maxIngredients,
     },
   };
 }
@@ -109,6 +141,8 @@ export function profileFromRow(row: ProfileRow): Profile {
     heightIn: Number(row.height_in),
     weightLb: Number(row.weight_lb),
     activityLevel: row.activity_level,
+    minIngredients: row.min_ingredients ?? null,
+    maxIngredients: row.max_ingredients ?? null,
   };
 }
 
@@ -116,7 +150,13 @@ export function profileToRow(
   profile: Profile,
 ): Pick<
   ProfileRow,
-  "age" | "sex" | "height_in" | "weight_lb" | "activity_level"
+  | "age"
+  | "sex"
+  | "height_in"
+  | "weight_lb"
+  | "activity_level"
+  | "min_ingredients"
+  | "max_ingredients"
 > {
   return {
     age: profile.age,
@@ -124,6 +164,8 @@ export function profileToRow(
     height_in: profile.heightIn,
     weight_lb: profile.weightLb,
     activity_level: profile.activityLevel,
+    min_ingredients: profile.minIngredients,
+    max_ingredients: profile.maxIngredients,
   };
 }
 
