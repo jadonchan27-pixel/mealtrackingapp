@@ -54,7 +54,7 @@ function withSession(target: NextResponse, session: NextResponse) {
 
 export const config = {
   matcher: [
-    // Everything except Next.js internals and files with an extension (icons, images).
-    "/((?!_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp|ico|txt|xml|json|webmanifest)$).*)",
+    // Everything except Next.js internals and static files (service worker, manifest, icons).
+    "/((?!_next/static|_next/image|favicon.ico|.*\\.(?:js|svg|png|jpg|jpeg|gif|webp|ico|txt|xml|json|webmanifest)$).*)",
   ],
 };
