@@ -14,6 +14,7 @@ const finalize = await import("@/app/api/weeks/[week]/finalize/route");
 const batches = await import("@/app/api/weeks/[week]/batches/route");
 const reset = await import("@/app/api/weeks/[week]/reset/route");
 const shopping = await import("@/app/api/weeks/[week]/shopping-list/route");
+const shoppingItem = await import("@/app/api/shopping-list/[id]/route");
 
 function signedIn(seed: Parameters<typeof fakeRecipeTables>[0] = {}) {
   const db = fakeRecipeTables(seed);
@@ -332,5 +333,48 @@ describe("GET /api/weeks/:id/shopping-list", () => {
     expect(draft.status).toBe(409);
     const missing = await shopping.GET(request("GET"), params({ week: "9" }));
     expect(missing.status).toBe(404);
+  });
+});
+
+describe("PATCH /api/shopping-list/:id", () => {
+  it("checks an item off, refusing a bad body or an unknown item", async () => {
+    const db = signedIn({
+      seed: {
+        shopping_list_items: [
+          {
+            id: 1,
+            week_plan_id: 1,
+            heb_product_id: null,
+            name: "Limes, each",
+            section: "produce",
+            needed_grams: 120,
+            packages: 2,
+            price_cents: 50,
+            batch: "both",
+            checked: false,
+          },
+        ],
+      },
+    });
+    const res = await shoppingItem.PATCH(
+      request("PATCH", { checked: true }),
+      params({ id: "1" }),
+    );
+    expect(res.status).toBe(200);
+    expect((await res.json()).item).toMatchObject({ id: 1, checked: true });
+    expect(db.table("shopping_list_items")[0].checked).toBe(true);
+
+    const bad = await shoppingItem.PATCH(
+      request("PATCH", { checked: "yes" }),
+      params({ id: "1" }),
+    );
+    expect(bad.status).toBe(400);
+    for (const id of ["2", "abc"]) {
+      const missing = await shoppingItem.PATCH(
+        request("PATCH", { checked: true }),
+        params({ id }),
+      );
+      expect(missing.status).toBe(404);
+    }
   });
 });
