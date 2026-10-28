@@ -2,7 +2,9 @@
 // ingredients at an Austin H-E-B, and the store section each is shelved in.
 // These are rough 2026 estimates; prices Jadon enters from receipts replace
 // them (step 17). A food is matched to the most specific entry whose words
-// all appear in its name ("chicken breast" beats "chicken").
+// all appear in its name ("chicken breast" beats "chicken"). On a tie, a
+// variety beats a generic word ("mozzarella cheese" is mozzarella, not
+// cheese; "chicken bouillon" is bouillon, not chicken).
 
 import type { StoreSection } from "@/lib/db/types";
 
@@ -253,6 +255,60 @@ const ROWS: Row[] = [
   ["curry paste", "Red curry paste, 4 oz", "spices_staples", 4 * OZ, 349],
   ["olive", "Sliced black olives, 2.25 oz can", "pantry", 64, 129],
 
+  // Two-word names whose words would otherwise match another product
+  ["egg noodle", "Egg noodles, 12 oz", "pantry", 12 * OZ, 199],
+  ["flour tortilla", "Flour tortillas, 10 ct", "bakery", 450, 249],
+  ["bean sprout", "Bean sprouts, 12 oz", "produce", 12 * OZ, 199],
+  ["snap pea", "Sugar snap peas, 8 oz", "produce", 8 * OZ, 299],
+  ["ground chuck", "Ground chuck 80/20, per lb", "meat_seafood", LB, 549],
+  ["avocado oil", "Avocado oil, 16.9 oz", "spices_staples", 460, 899],
+  ["peanut oil", "Peanut oil, 24 oz", "spices_staples", 680, 549],
+  ["almond butter", "Almond butter, 12 oz", "pantry", 12 * OZ, 699],
+  ["beef stock", "Beef stock, 32 oz", "pantry", 946, 249],
+  ["vegetable stock", "Vegetable stock, 32 oz", "pantry", 946, 249],
+  ["stock", "Chicken stock, 32 oz", "pantry", 946, 249],
+  ["corn starch", "Cornstarch, 16 oz", "pantry", LB, 199],
+  ["frozen corn", "Frozen sweet corn, 12 oz", "frozen", 12 * OZ, 149],
+  [
+    "cream of chicken",
+    "Cream of chicken soup, 10.5 oz can",
+    "pantry",
+    298,
+    149,
+  ],
+  [
+    "cream of mushroom",
+    "Cream of mushroom soup, 10.5 oz can",
+    "pantry",
+    298,
+    149,
+  ],
+  ["bouillon", "Chicken bouillon cubes, 25 ct", "spices_staples", 100, 249],
+  ["pepper jack", "Pepper Jack cheese, 8 oz", "dairy_eggs", 8 * OZ, 299],
+  ["garlic salt", "Garlic salt, 4.75 oz", "spices_staples", 135, 199],
+  ["tortilla chip", "Tortilla chips, 13 oz", "pantry", 13 * OZ, 299],
+  ["oat milk", "Oat milk, half gallon", "dairy_eggs", 1890, 399],
+  ["buttermilk", "Buttermilk, 1 quart", "dairy_eggs", 946, 199],
+  ["tomatillo", "Tomatillos, per lb", "produce", LB, 199],
+  [
+    "fire roasted tomato",
+    "Fire roasted diced tomatoes, 14.5 oz can",
+    "pantry",
+    411,
+    149,
+  ],
+  [
+    "rotel",
+    "Diced tomatoes and green chiles, 10 oz can",
+    "pantry",
+    10 * OZ,
+    129,
+  ],
+  ["fresh thyme", "Fresh thyme, 0.75 oz", "produce", 21, 199],
+  ["fresh rosemary", "Fresh rosemary, 0.75 oz", "produce", 21, 199],
+  ["lime juice", "Lime juice, 15 oz", "pantry", 15 * OZ, 249],
+  ["lemon juice", "Lemon juice, 15 oz", "pantry", 15 * OZ, 249],
+
   // Spices and staples
   ["salt", "Iodized salt, 26 oz", "spices_staples", 26 * OZ, 99],
   ["black pepper", "Ground black pepper, 3 oz", "spices_staples", 3 * OZ, 349],
@@ -288,15 +344,54 @@ const ROWS: Row[] = [
   ["baking soda", "Baking soda, 16 oz", "spices_staples", LB, 129],
 ];
 
-export const HEB_CATALOG: readonly CatalogItem[] = ROWS.map(
-  ([match, name, section, packageGrams, priceCents]) => ({
-    match,
-    name,
-    section,
-    packageGrams: Math.round(packageGrams),
-    priceCents,
-  }),
-);
+// Single words that name a whole family of products. They're listed after
+// everything else, so on a tie the variety wins (matching keeps the first).
+const GENERIC = new Set([
+  "chicken",
+  "beef",
+  "pork",
+  "turkey",
+  "cheese",
+  "cream",
+  "milk",
+  "butter",
+  "egg",
+  "oil",
+  "pepper",
+  "salt",
+  "bean",
+  "rice",
+  "corn",
+  "tomato",
+  "onion",
+  "garlic",
+  "avocado",
+  "peanut",
+  "almond",
+  "olive",
+  "broth",
+  "stock",
+  "noodle",
+  "pasta",
+  "tortilla",
+  "bread",
+  "lime",
+  "lemon",
+  "berry",
+  "sugar",
+  "vinegar",
+]);
+
+export const HEB_CATALOG: readonly CatalogItem[] = [
+  ...ROWS.filter(([match]) => !GENERIC.has(match)),
+  ...ROWS.filter(([match]) => GENERIC.has(match)),
+].map(([match, name, section, packageGrams, priceCents]) => ({
+  match,
+  name,
+  section,
+  packageGrams: Math.round(packageGrams),
+  priceCents,
+}));
 
 // Default price per gram and package size for a food the catalog doesn't
 // know, by store section.
@@ -354,7 +449,20 @@ const SECTION_HINTS: [StoreSection, string[]][] = [
   ["frozen", ["frozen"]],
   [
     "meat_seafood",
-    ["fish", "fillet", "lamb", "veal", "crab", "scallop", "meat"],
+    [
+      "fish",
+      "fillet",
+      "lamb",
+      "veal",
+      "crab",
+      "scallop",
+      "meat",
+      "chuck",
+      "sirloin",
+      "bison",
+      "venison",
+      "brisket",
+    ],
   ],
   ["dairy_eggs", ["cheese", "milk", "cream", "yogurt"]],
   [
@@ -386,9 +494,13 @@ export type EstimatedProduct = {
 export function estimateProduct(foodName: string): EstimatedProduct {
   const item = matchCatalog(foodName);
   if (item) {
+    // "frozen spinach" is priced like spinach but shelved with the frozen
+    // food.
+    const frozen =
+      item.section === "produce" && words(foodName).includes("frozen");
     return {
       name: item.name,
-      section: item.section,
+      section: frozen ? "frozen" : item.section,
       packageGrams: item.packageGrams,
       priceCents: item.priceCents,
     };

@@ -52,6 +52,29 @@ describe("matchCatalog", () => {
     ["bay leaves", "bay leaf"],
     ["jalapeño", "jalapeño"],
     ["crushed red pepper flakes", "red pepper flake"],
+    ["shredded mozzarella cheese", "mozzarella"],
+    ["grated parmesan cheese", "parmesan"],
+    ["crumbled feta cheese", "feta"],
+    ["cotija cheese", "cotija"],
+    ["ricotta cheese", "ricotta"],
+    ["pepper jack cheese", "pepper jack"],
+    ["shredded cheese", "cheese"],
+    ["egg noodles", "egg noodle"],
+    ["avocado oil", "avocado oil"],
+    ["peanut oil", "peanut oil"],
+    ["almond butter", "almond butter"],
+    ["beef stock", "beef stock"],
+    ["vegetable stock", "vegetable stock"],
+    ["corn starch", "corn starch"],
+    ["frozen corn", "frozen corn"],
+    ["cream of chicken soup", "cream of chicken"],
+    ["chicken bouillon", "bouillon"],
+    ["garlic salt", "garlic salt"],
+    ["lime juice", "lime juice"],
+    ["avocado", "avocado"],
+    ["flour tortillas", "flour tortilla"],
+    ["sugar snap peas", "snap pea"],
+    ["bean sprouts", "bean sprout"],
   ])("%s → %s", (food, match) => {
     expect(matchCatalog(food)?.match).toBe(match);
   });
@@ -70,6 +93,9 @@ describe("guessSection", () => {
   it.each([
     ["frozen peas", "frozen"],
     ["ground lamb", "meat_seafood"],
+    ["ground chuck", "meat_seafood"],
+    ["ground bison", "meat_seafood"],
+    ["ground venison", "meat_seafood"],
     ["goat cheese", "dairy_eggs"],
     ["dried dill", "spices_staples"],
     ["dinner rolls", "bakery"],
@@ -81,6 +107,34 @@ describe("guessSection", () => {
 });
 
 describe("estimateProduct", () => {
+  it("prices the cheeses as themselves", () => {
+    expect(estimateProduct("grated parmesan cheese")).toMatchObject({
+      name: "Grated Parmesan, 6 oz",
+      priceCents: 449,
+    });
+  });
+
+  it("prices beef stock as stock, not as a roast", () => {
+    expect(estimateProduct("beef stock")).toMatchObject({
+      section: "pantry",
+      priceCents: 249,
+    });
+  });
+
+  it("prices ground chuck like meat, not a spice", () => {
+    const { priceCents, packageGrams, section } =
+      estimateProduct("ground chuck");
+    expect(section).toBe("meat_seafood");
+    expect(priceCents / packageGrams).toBeLessThan(2);
+  });
+
+  it("shelves frozen produce with the frozen food", () => {
+    expect(estimateProduct("frozen spinach")).toMatchObject({
+      name: "Baby spinach, 5 oz",
+      section: "frozen",
+    });
+  });
+
   it("uses the catalog entry when the name matches", () => {
     expect(estimateProduct("chicken breasts")).toEqual({
       name: "Chicken breasts, boneless skinless, per lb",
