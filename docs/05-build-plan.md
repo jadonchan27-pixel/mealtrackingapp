@@ -16,7 +16,7 @@ Status: ☐ not started · ◐ in progress · ☑ done and validated
 
 ## Phase 1: Foundation
 
-### ☐ Step 1. Project scaffold
+### ◐ Step 1. Project scaffold
 1. Create the Next.js (App Router) TypeScript app with ESLint and Prettier.
 2. Add Vitest with one sample test, and `npm test`, `npm run lint`, `npm run build` scripts.
 3. Add a GitHub Actions workflow that runs lint, test and build on every push.
