@@ -42,7 +42,15 @@ export type UsdaClientOptions = {
   fetch?: typeof fetch;
 };
 
-export class UsdaError extends Error {}
+export class UsdaError extends Error {
+  constructor(
+    message: string,
+    // The HTTP status, when USDA answered.
+    readonly status?: number,
+  ) {
+    super(message);
+  }
+}
 
 export function usdaApiKey(): string {
   const key = process.env.USDA_API_KEY;
@@ -66,6 +74,7 @@ export function createUsdaClient(options: UsdaClientOptions = {}) {
     if (!res.ok) {
       throw new UsdaError(
         `USDA request failed: ${res.status} ${res.statusText}`,
+        res.status,
       );
     }
     return (await res.json()) as unknown;
@@ -108,7 +117,15 @@ export function createUsdaClient(options: UsdaClientOptions = {}) {
   // since its cup weighs something else. The food's own portions
   // win where both have one.
   async function findFood(query: string): Promise<UsdaFood | null> {
-    const fdcId = await search(query);
+    let fdcId: number | null;
+    try {
+      fdcId = await search(query);
+    } catch (err) {
+      // USDA rejects some odd names outright (400); that's no match, not an
+      // outage, so one strange ingredient doesn't sink the whole recipe.
+      if (err instanceof UsdaError && err.status === 400) return null;
+      throw err;
+    }
     if (fdcId === null) return null;
     const food = await getFood(fdcId);
     if (hasWholeItemSize(food)) return food;

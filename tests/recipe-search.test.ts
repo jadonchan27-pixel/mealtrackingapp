@@ -6,6 +6,7 @@ import { describe, expect, it, vi } from "vitest";
 import type { FoodRow } from "@/lib/db/types";
 import {
   findTopRecipes,
+  mightBeRecipePage,
   previousWeekRecipeIds,
   previousWeekStart,
   searchQuery,
@@ -219,6 +220,28 @@ describe("findTopRecipes", () => {
       ["Indian high protein snack recipe", 10],
       ["Thai high protein snack recipe", 10],
     ]);
+  });
+});
+
+describe("mightBeRecipePage", () => {
+  it.each([
+    "https://www.youtube.com/watch?v=abc",
+    "https://m.youtube.com/watch?v=abc",
+    "https://www.pinterest.com/pin/123/",
+    "https://blog.test/category/high-protein-indian-recipes/",
+    "https://blog.test/tag/dinner",
+    "https://blog.test/menu.pdf",
+    "not a url",
+  ])("skips %s", (url) => {
+    expect(mightBeRecipePage(url)).toBe(false);
+  });
+
+  it.each([
+    "https://cookieandkate.com/best-lentil-soup-recipe/",
+    "https://www.recipetineats.com/chicken-stir-fry/",
+    "https://blog.test/recipes/tagine/",
+  ])("keeps %s", (url) => {
+    expect(mightBeRecipePage(url)).toBe(true);
   });
 });
 

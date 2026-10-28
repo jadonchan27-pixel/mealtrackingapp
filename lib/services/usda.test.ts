@@ -346,6 +346,27 @@ describe("createUsdaClient", () => {
     );
   });
 
+  it("treats a name USDA rejects as no match", async () => {
+    const fetch = vi
+      .fn()
+      .mockResolvedValue(
+        new Response("", { status: 400, statusText: "Bad Request" }),
+      );
+    const usda = createUsdaClient({ apiKey: "k", fetch });
+    expect(await usda.findFood("½ of a 🌶️")).toBeNull();
+  });
+
+  it("still throws when USDA is down or rate limited", async () => {
+    const fetch = vi
+      .fn()
+      .mockResolvedValue(
+        new Response("", { status: 503, statusText: "Service Unavailable" }),
+      );
+    await expect(
+      createUsdaClient({ apiKey: "k", fetch }).findFood("rice"),
+    ).rejects.toMatchObject({ status: 503 });
+  });
+
   it("needs an API key", () => {
     vi.stubEnv("USDA_API_KEY", "");
     expect(() => usdaApiKey()).toThrow(UsdaError);

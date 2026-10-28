@@ -18,6 +18,38 @@ export function searchQuery(slot: MealSlot, cuisine?: string): string {
     .join(" ");
 }
 
+// Sites whose pages are videos or posts, never a recipe page to read.
+const NON_RECIPE_HOSTS = [
+  "youtube.com",
+  "youtu.be",
+  "pinterest.com",
+  "facebook.com",
+  "instagram.com",
+  "tiktok.com",
+  "reddit.com",
+  "x.com",
+  "twitter.com",
+];
+
+// Skips links that can't be a single recipe: video and social sites, and
+// category, tag and search listing pages.
+export function mightBeRecipePage(url: string): boolean {
+  let u: URL;
+  try {
+    u = new URL(url);
+  } catch {
+    return false;
+  }
+  const host = u.hostname.replace(/^(www|m)\./, "");
+  if (NON_RECIPE_HOSTS.some((h) => host === h || host.endsWith(`.${h}`))) {
+    return false;
+  }
+  if (/\.pdf$/i.test(u.pathname)) return false;
+  return !/\/(category|categories|tag|tags|search|collections?)\//i.test(
+    `${u.pathname}/`,
+  );
+}
+
 // The Sunday a week before `weekStart` (YYYY-MM-DD).
 export function previousWeekStart(weekStart: string): string {
   const d = new Date(`${weekStart}T00:00:00Z`);
@@ -89,7 +121,7 @@ export async function findTopRecipes({
   const urls: string[] = [];
   for (const q of queries) {
     for (const url of await brave.search(q, perQuery)) {
-      if (!urls.includes(url)) urls.push(url);
+      if (!urls.includes(url) && mightBeRecipePage(url)) urls.push(url);
     }
   }
 
