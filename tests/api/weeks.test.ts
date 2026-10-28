@@ -12,6 +12,7 @@ const candidate = await import("@/app/api/candidates/[id]/route");
 const recipe = await import("@/app/api/recipes/[id]/route");
 const finalize = await import("@/app/api/weeks/[week]/finalize/route");
 const batches = await import("@/app/api/weeks/[week]/batches/route");
+const reset = await import("@/app/api/weeks/[week]/reset/route");
 
 function signedIn(seed: Parameters<typeof fakeRecipeTables>[0] = {}) {
   const db = fakeRecipeTables(seed);
@@ -48,8 +49,11 @@ describe("auth", () => {
       candidates.POST(request("POST", {}), params({ week: "1" })),
       candidate.PATCH(request("PATCH", {}), params({ id: "1" })),
       recipe.GET(request("GET"), params({ id: "1" })),
+      reset.POST(request("POST"), params({ week: "1" })),
     ]);
-    expect(responses.map((r) => r.status)).toEqual([401, 401, 401, 401, 401]);
+    expect(responses.map((r) => r.status)).toEqual([
+      401, 401, 401, 401, 401, 401,
+    ]);
   });
 });
 
@@ -250,5 +254,28 @@ describe("GET /api/weeks/:id/batches", () => {
     expect(draft.status).toBe(409);
     const missing = await batches.GET(request("GET"), params({ week: "2" }));
     expect(missing.status).toBe(404);
+  });
+});
+
+describe("POST /api/weeks/:id/reset", () => {
+  it("deletes the week, or 404 for an unknown one", async () => {
+    const db = signedIn({
+      seed: {
+        week_plans: [{ id: 1, week_start: "2026-11-01", status: "final" }],
+        plan_candidates: [
+          { id: 1, week_plan_id: 1, slot: "lunch", recipe_id: 1, rank: 1 },
+        ],
+      },
+    });
+    const res = await reset.POST(request("POST"), params({ week: "1" }));
+    expect(res.status).toBe(200);
+    expect(await res.json()).toEqual({ ok: true });
+    expect(db.table("week_plans")).toHaveLength(0);
+    expect(db.table("plan_candidates")).toHaveLength(0);
+
+    for (const id of ["1", "abc"]) {
+      const missing = await reset.POST(request("POST"), params({ week: id }));
+      expect(missing.status).toBe(404);
+    }
   });
 });
