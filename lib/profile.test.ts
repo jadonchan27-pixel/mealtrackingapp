@@ -73,6 +73,8 @@ describe("row mapping", () => {
     weight_lb: 160,
     activity_level: "moderate",
     surplus_kcal: 300,
+    min_ingredients: null,
+    max_ingredients: null,
     created_at: "2026-10-28T00:00:00Z",
     updated_at: "2026-10-28T00:00:00Z",
   };
