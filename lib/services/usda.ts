@@ -74,10 +74,13 @@ export function createUsdaClient(options: UsdaClientOptions = {}) {
   // The best matching food's id, or null when USDA has nothing for the name.
   // USDA's own first result is often a part or a variety ("egg white" for
   // "eggs"), so the top results are scored by bestMatch instead.
-  async function search(query: string): Promise<number | null> {
+  async function search(
+    query: string,
+    dataTypes: readonly string[] = DATA_TYPES,
+  ): Promise<number | null> {
     const json = (await get("/foods/search", {
       query,
-      dataType: DATA_TYPES.join(","),
+      dataType: dataTypes.join(","),
       pageSize: "25",
     })) as { foods?: SearchResult[] };
     return bestMatch(query, json.foods ?? [])?.fdcId ?? null;
@@ -87,9 +90,18 @@ export function createUsdaClient(options: UsdaClientOptions = {}) {
     return toUsdaFood((await get(`/food/${fdcId}`)) as FoodDetails);
   }
 
+  // Foundation foods often list no household portions, so "2 large eggs"
+  // couldn't be weighed. Then the portions come from the best SR Legacy match.
   async function findFood(query: string): Promise<UsdaFood | null> {
     const fdcId = await search(query);
-    return fdcId === null ? null : getFood(fdcId);
+    if (fdcId === null) return null;
+    const food = await getFood(fdcId);
+    if (Object.keys(food.gramsPerUnit).length > 0) return food;
+
+    const legacyId = await search(query, ["SR Legacy"]);
+    if (legacyId === null || legacyId === fdcId) return food;
+    const legacy = await getFood(legacyId);
+    return { ...food, gramsPerUnit: legacy.gramsPerUnit };
   }
 
   return { search, getFood, findFood };
@@ -248,6 +260,9 @@ const SPECIFIC_WORDS = new Set([
   "fast",
   "foods",
   "brand",
+  "grass-fed",
+  "organic",
+  "wagyu",
 ]);
 
 // Filler in USDA descriptions that says nothing about which food it is.
@@ -312,6 +327,8 @@ export function bestMatch(
       !wantedSet.has("yolk")
     )
       score += 4;
+    // A blend lists several foods: "Oil, corn, peanut, and olive".
+    if (descSet.has("and") && !wantedSet.has("and")) score -= 5;
     if (result.dataType === "SR Legacy") score += 3;
     score -= rank * 0.1; // USDA's order breaks remaining ties
 

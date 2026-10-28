@@ -84,6 +84,53 @@ describe("createUsdaClient", () => {
     );
   });
 
+  it("borrows SR Legacy portions when the match has none", async () => {
+    const foundationEgg = {
+      fdcId: 748967,
+      description: "Eggs, Grade A, Large, egg whole",
+      foodNutrients: [{ nutrient: { id: 1008 }, amount: 148 }],
+      foodPortions: [],
+    };
+    const fetch = vi
+      .fn()
+      .mockResolvedValueOnce(
+        jsonResponse({
+          foods: [
+            {
+              fdcId: 748967,
+              description: "Eggs, Grade A, Large, egg whole",
+              dataType: "Foundation",
+            },
+          ],
+        }),
+      )
+      .mockResolvedValueOnce(jsonResponse(foundationEgg))
+      .mockResolvedValueOnce(
+        jsonResponse({
+          foods: [
+            {
+              fdcId: 171287,
+              description: "Egg, whole, raw, fresh",
+              dataType: "SR Legacy",
+            },
+          ],
+        }),
+      )
+      .mockResolvedValueOnce(jsonResponse(egg));
+    const usda = createUsdaClient({ apiKey: "k", fetch });
+
+    const food = await usda.findFood("large eggs");
+
+    expect(food).toMatchObject({
+      fdcId: 748967,
+      per100g: { kcal: 148 },
+      gramsPerUnit: { large: 50, medium: 44 },
+    });
+    expect(new URL(fetch.mock.calls[2][0]).searchParams.get("dataType")).toBe(
+      "SR Legacy",
+    );
+  });
+
   it("returns null when nothing matches", async () => {
     const fetch = vi.fn().mockResolvedValue(jsonResponse({ foods: [] }));
     const usda = createUsdaClient({ apiKey: "k", fetch });
@@ -193,6 +240,22 @@ describe("bestMatch", () => {
       r(171265, "Milk, whole, 3.25% milkfat, with added vitamin D"),
     ];
     expect(bestMatch("2% milk", results)?.fdcId).toBe(171267);
+  });
+
+  it("prefers a single oil over a blend", () => {
+    const results = [
+      r(167737, "Oil, corn, peanut, and olive"),
+      r(171413, "Oil, olive, salad or cooking"),
+    ];
+    expect(bestMatch("olive oil", results)?.fdcId).toBe(171413);
+  });
+
+  it("prefers plain ground beef over grass-fed", () => {
+    const results = [
+      r(168608, "Beef, grass-fed, ground, raw"),
+      r(174036, "Beef, ground, 80% lean meat / 20% fat, raw"),
+    ];
+    expect(bestMatch("ground beef", results)?.fdcId).toBe(174036);
   });
 
   it("returns null for no results", () => {
