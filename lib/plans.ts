@@ -1,0 +1,396 @@
+// Draft week plans (US-7 to US-10): create a week, search a slot for its 3
+// candidates, select one, and read it all back in the shape the plan page and
+// the API share (camelCase, per serving).
+
+import type { SupabaseClient } from "@supabase/supabase-js";
+import type {
+  Database,
+  MealSlot,
+  PlanCandidateRow,
+  PlanStatus,
+  RecipeRow,
+  WeekPlanRow,
+} from "@/lib/db/types";
+import type { FoodLookup } from "@/lib/foods";
+import {
+  findTopRecipes,
+  previousWeekRecipeIds,
+  previousWeekStart,
+  type SkippedPage,
+} from "@/lib/recipeSearch";
+import type { BraveClient } from "@/lib/services/braveSearch";
+import type { RecipePage } from "@/lib/services/recipePage";
+import { MEAL_SLOTS, pickCuisine, type NewWeekInput } from "@/lib/weeks";
+
+type Supabase = SupabaseClient<Database>;
+
+export class PlanError extends Error {
+  name = "PlanError";
+  constructor(
+    message: string,
+    readonly status: 404 | 409 | 500 = 500,
+  ) {
+    super(message);
+  }
+}
+
+function check<T>(result: { data: T; error: { message: string } | null }): T {
+  if (result.error) throw new PlanError(result.error.message);
+  return result.data;
+}
+
+// Rows of a select that lists rows; never null once the error is checked.
+function rows<T>(result: {
+  data: T[] | null;
+  error: { message: string } | null;
+}): T[] {
+  return check(result) ?? [];
+}
+
+export type RecipeSummary = {
+  id: number;
+  title: string;
+  sourceUrl: string;
+  photoUrl: string | null;
+  cuisine: string | null;
+  servings: number;
+  activeMinutes: number | null;
+  kcal: number | null;
+  proteinG: number | null;
+  carbsG: number | null;
+  fatG: number | null;
+  costCentsPerServing: number | null;
+  // Ingredient lines as the recipe gives them, portions included.
+  ingredients: string[];
+};
+
+export type CandidateView = {
+  id: number;
+  slot: MealSlot;
+  rank: number;
+  selected: boolean;
+  recipe: RecipeSummary;
+};
+
+export type WeekView = {
+  id: number;
+  weekStart: string;
+  cuisines: string[];
+  status: PlanStatus;
+  candidates: Record<MealSlot, CandidateView[]>;
+};
+
+function num(v: number | null): number | null {
+  return v === null ? null : Number(v);
+}
+
+function summary(recipe: RecipeRow, ingredients: string[]): RecipeSummary {
+  return {
+    id: recipe.id,
+    title: recipe.title,
+    sourceUrl: recipe.source_url,
+    photoUrl: recipe.photo_url,
+    cuisine: recipe.cuisine,
+    servings: Number(recipe.servings),
+    activeMinutes: recipe.active_minutes,
+    kcal: num(recipe.kcal),
+    proteinG: num(recipe.protein_g),
+    carbsG: num(recipe.carbs_g),
+    fatG: num(recipe.fat_g),
+    costCentsPerServing: num(recipe.cost_cents_per_serving),
+    ingredients,
+  };
+}
+
+// Candidate rows with their recipes, grouped by slot, best rank first.
+async function candidateViews(
+  supabase: Supabase,
+  candidates: PlanCandidateRow[],
+): Promise<Record<MealSlot, CandidateView[]>> {
+  const ids = [...new Set(candidates.map((r) => r.recipe_id))];
+  const recipes: RecipeRow[] =
+    ids.length === 0
+      ? []
+      : rows(await supabase.from("recipes").select("*").in("id", ids));
+  const lines =
+    ids.length === 0
+      ? []
+      : rows(
+          await supabase
+            .from("recipe_ingredients")
+            .select("recipe_id, raw_text")
+            .in("recipe_id", ids)
+            .order("id", { ascending: true }),
+        );
+
+  const grouped = Object.fromEntries(
+    MEAL_SLOTS.map((s) => [s, [] as CandidateView[]]),
+  ) as Record<MealSlot, CandidateView[]>;
+  for (const row of [...candidates].sort((a, b) => a.rank - b.rank)) {
+    const recipe = recipes.find((r) => r.id === row.recipe_id);
+    if (!recipe) continue;
+    grouped[row.slot].push({
+      id: row.id,
+      slot: row.slot,
+      rank: row.rank,
+      selected: row.selected,
+      recipe: summary(
+        recipe,
+        lines.filter((l) => l.recipe_id === recipe.id).map((l) => l.raw_text),
+      ),
+    });
+  }
+  return grouped;
+}
+
+async function weekView(supabase: Supabase, week: WeekPlanRow) {
+  const candidateRows = rows(
+    await supabase
+      .from("plan_candidates")
+      .select("*")
+      .eq("week_plan_id", week.id),
+  );
+  return {
+    id: week.id,
+    weekStart: week.week_start,
+    cuisines: week.cuisines,
+    status: week.status,
+    candidates: await candidateViews(supabase, candidateRows),
+  } satisfies WeekView;
+}
+
+// The week starting on `weekStart`, or null when it hasn't been started.
+export async function loadWeek(
+  supabase: Supabase,
+  weekStart: string,
+): Promise<WeekView | null> {
+  const week = check(
+    await supabase
+      .from("week_plans")
+      .select("*")
+      .eq("week_start", weekStart)
+      .maybeSingle(),
+  );
+  return week ? weekView(supabase, week) : null;
+}
+
+async function weekById(supabase: Supabase, id: number): Promise<WeekPlanRow> {
+  const week = check(
+    await supabase.from("week_plans").select("*").eq("id", id).maybeSingle(),
+  );
+  if (!week) throw new PlanError("Week not found", 404);
+  return week;
+}
+
+function assertDraft(week: WeekPlanRow) {
+  if (week.status !== "draft") {
+    throw new PlanError("This week's plan is already finalized", 409);
+  }
+}
+
+// US-7: starts the week's draft, or changes the cuisines of one already
+// started. With no cuisine chosen, the app picks one not used last week.
+export async function startWeek(
+  supabase: Supabase,
+  { weekStart, cuisines }: NewWeekInput,
+  random?: () => number,
+): Promise<WeekView> {
+  let chosen = cuisines;
+  if (chosen.length === 0) {
+    const lastWeek = check(
+      await supabase
+        .from("week_plans")
+        .select("cuisines")
+        .eq("week_start", previousWeekStart(weekStart))
+        .maybeSingle(),
+    );
+    chosen = [pickCuisine(lastWeek?.cuisines ?? [], random)];
+  }
+
+  const existing = check(
+    await supabase
+      .from("week_plans")
+      .select("*")
+      .eq("week_start", weekStart)
+      .maybeSingle(),
+  );
+  if (existing) {
+    assertDraft(existing);
+    check(
+      await supabase
+        .from("week_plans")
+        .update({ cuisines: chosen })
+        .eq("id", existing.id),
+    );
+    return weekView(supabase, { ...existing, cuisines: chosen });
+  }
+
+  check(
+    await supabase
+      .from("week_plans")
+      .insert({ week_start: weekStart, cuisines: chosen }),
+  );
+  const created = await loadWeek(supabase, weekStart);
+  if (!created) throw new PlanError("Couldn't start the week");
+  return created;
+}
+
+export type SlotSearch = {
+  candidates: CandidateView[];
+  // Pages read for this slot and the ones that couldn't be used.
+  pagesRead: number;
+  skipped: SkippedPage[];
+};
+
+// US-8: searches the web for one slot and replaces its candidates with the
+// top 3, the best one selected. Recipes from last week are left out (TR-13),
+// and so are recipes already picked for this week's other slots.
+export async function searchSlot({
+  supabase,
+  weekId,
+  slot,
+  brave,
+  lookup,
+  readPage,
+  wait,
+}: {
+  supabase: Supabase;
+  weekId: number;
+  slot: MealSlot;
+  brave: Pick<BraveClient, "search">;
+  lookup: FoodLookup;
+  readPage?: (url: string) => Promise<RecipePage | null>;
+  wait?: (ms: number) => Promise<void>;
+}): Promise<SlotSearch> {
+  const week = await weekById(supabase, weekId);
+  assertDraft(week);
+
+  const excludedIds = await previousWeekRecipeIds(supabase, week.week_start);
+  const others = rows(
+    await supabase
+      .from("plan_candidates")
+      .select("slot, recipe_id, selected")
+      .eq("week_plan_id", week.id),
+  );
+  for (const c of others) {
+    if (c.slot !== slot && c.selected) excludedIds.add(c.recipe_id);
+  }
+
+  const found = await findTopRecipes({
+    supabase,
+    brave,
+    lookup,
+    slot,
+    cuisines: week.cuisines,
+    excludedIds,
+    readPage,
+    wait,
+  });
+
+  check(
+    await supabase
+      .from("plan_candidates")
+      .delete()
+      .eq("week_plan_id", week.id)
+      .eq("slot", slot),
+  );
+  if (found.top.length > 0) {
+    check(
+      await supabase.from("plan_candidates").insert(
+        found.top.map(({ recipe }, i) => ({
+          week_plan_id: week.id,
+          slot,
+          recipe_id: recipe.id,
+          rank: i + 1,
+          selected: i === 0,
+        })),
+      ),
+    );
+  }
+  const candidateRows = rows(
+    await supabase
+      .from("plan_candidates")
+      .select("*")
+      .eq("week_plan_id", week.id)
+      .eq("slot", slot),
+  );
+  return {
+    candidates: (await candidateViews(supabase, candidateRows))[slot],
+    pagesRead: found.recipes.length + found.skipped.length,
+    skipped: found.skipped,
+  };
+}
+
+// US-10: picks a candidate, unselecting the others in its slot.
+export async function selectCandidate(
+  supabase: Supabase,
+  candidateId: number,
+): Promise<CandidateView[]> {
+  const candidate = check(
+    await supabase
+      .from("plan_candidates")
+      .select("*")
+      .eq("id", candidateId)
+      .maybeSingle(),
+  );
+  if (!candidate) throw new PlanError("Candidate not found", 404);
+  assertDraft(await weekById(supabase, candidate.week_plan_id));
+
+  check(
+    await supabase
+      .from("plan_candidates")
+      .update({ selected: false })
+      .eq("week_plan_id", candidate.week_plan_id)
+      .eq("slot", candidate.slot),
+  );
+  check(
+    await supabase
+      .from("plan_candidates")
+      .update({ selected: true })
+      .eq("id", candidate.id),
+  );
+  const candidateRows = rows(
+    await supabase
+      .from("plan_candidates")
+      .select("*")
+      .eq("week_plan_id", candidate.week_plan_id)
+      .eq("slot", candidate.slot),
+  );
+  return (await candidateViews(supabase, candidateRows))[candidate.slot];
+}
+
+export type RecipeDetail = Omit<RecipeSummary, "ingredients"> & {
+  fiberG: number | null;
+  sugarG: number | null;
+  sodiumMg: number | null;
+  ingredients: { text: string; grams: number | null }[];
+  steps: string[];
+};
+
+// US-9: a recipe with its ingredients and steps, or null when there's none.
+export async function loadRecipe(
+  supabase: Supabase,
+  id: number,
+): Promise<RecipeDetail | null> {
+  const recipe = check(
+    await supabase.from("recipes").select("*").eq("id", id).maybeSingle(),
+  );
+  if (!recipe) return null;
+  const lines = rows(
+    await supabase
+      .from("recipe_ingredients")
+      .select("raw_text, grams")
+      .eq("recipe_id", id)
+      .order("id", { ascending: true }),
+  );
+  return {
+    ...summary(recipe, []),
+    fiberG: num(recipe.fiber_g),
+    sugarG: num(recipe.sugar_g),
+    sodiumMg: num(recipe.sodium_mg),
+    ingredients: lines.map((l) => ({ text: l.raw_text, grams: num(l.grams) })),
+    steps: Array.isArray(recipe.steps)
+      ? recipe.steps.filter((s): s is string => typeof s === "string")
+      : [],
+  };
+}
