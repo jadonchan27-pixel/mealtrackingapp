@@ -121,6 +121,14 @@ Status: ☐ not started · ◐ in progress · ☑ done and validated
 
 **Done when:** batch quantities match servings per day × days.
 
+### ☐ Step 14a. Ingredient count range (US-28, TR-22)
+1. 🧑 Run `supabase/migrations/003_ingredient_range.sql` in the Supabase SQL Editor (adds `min_ingredients` and `max_ingredients` to `profile`).
+2. `lib/ingredientCount.ts`: count a recipe's ingredients without pantry staples, with tests.
+3. Profile page and `/api/profile`: optional min and max ingredients.
+4. Recipe search leaves out recipes outside the range (TR-22).
+
+**Done when:** with a 3–5 range, every shortlisted recipe has 3 to 5 counted ingredients.
+
 ## Phase 5: Shopping list
 
 ### ☐ Step 15. H-E-B price table (TR-16)
