@@ -101,33 +101,44 @@ export function createUsdaClient(options: UsdaClientOptions = {}) {
   // Foundation foods often list no whole-item portions, so "2 large eggs" or
   // "1 onion" couldn't be weighed. Then the missing portions come from SR
   // Legacy: the best few matches for the line, then for its last word
-  // ("onion" for "yellow onion"), until one weighs a whole item. The food's
-  // own portions win where both have one.
+  // ("onion" for "yellow onion"), until one weighs a whole item. A match that
+  // adds nothing but generic words ("Onions, raw") is the same food, so all
+  // its portions are borrowed; one that adds a variety or a cooking method
+  // ("Cheese, parmesan" for "cheddar cheese") lends whole-item sizes alone,
+  // since its cup weighs something else. The food's own portions
+  // win where both have one.
   async function findFood(query: string): Promise<UsdaFood | null> {
     const fdcId = await search(query);
     if (fdcId === null) return null;
     const food = await getFood(fdcId);
     if (hasWholeItemSize(food)) return food;
 
+    const wanted = new Set(wantedWords(query));
+    const head = headNoun(query);
     const tried = new Set([fdcId]);
-    let fallback: UsdaFood | null = null;
+    let sameFood: UsdaFood | null = null;
     let fetches = 0;
     for (const q of legacyQueries(query)) {
-      const head = headNoun(q);
       for (const result of await searchRanked(q, ["SR Legacy"])) {
         if (fetches >= MAX_LEGACY_FETCHES) break;
         if (tried.has(result.fdcId)) continue;
-        if (words(result.description)[0] !== head) continue;
+        const desc = words(result.description);
+        if (desc[0] !== head) continue;
         tried.add(result.fdcId);
         fetches++;
         const legacy = await getFood(result.fdcId);
-        fallback ??= legacy;
+        const same = desc.every(
+          (w) => wanted.has(w) || FILLER_WORDS.has(w) || GENERIC_WORDS.has(w),
+        );
+        if (same) sameFood ??= legacy;
         if (hasWholeItemSize(legacy)) {
-          return withPortionsFrom(food, legacy);
+          const base =
+            sameFood === null ? food : withPortionsFrom(food, sameFood);
+          return withPortionsFrom(base, same ? legacy : wholeItemSizes(legacy));
         }
       }
     }
-    return fallback === null ? food : withPortionsFrom(food, fallback);
+    return sameFood === null ? food : withPortionsFrom(food, sameFood);
   }
 
   return { search, getFood, findFood };
@@ -140,6 +151,17 @@ const MAX_LEGACY_FETCHES = 4;
 
 function hasWholeItemSize(food: UsdaFood): boolean {
   return WHOLE_ITEM_SIZES.some((k) => food.gramsPerUnit[k] !== undefined);
+}
+
+function wholeItemSizes(food: UsdaFood): UsdaFood {
+  return {
+    ...food,
+    gramsPerUnit: Object.fromEntries(
+      Object.entries(food.gramsPerUnit).filter(([k]) =>
+        WHOLE_ITEM_SIZES.includes(k),
+      ),
+    ),
+  };
 }
 
 function withPortionsFrom(food: UsdaFood, legacy: UsdaFood): UsdaFood {
@@ -345,6 +367,9 @@ const SPECIFIC_WORDS = new Set([
   "organic",
   "wagyu",
 ]);
+
+// Description words that don't make a food a different one.
+const GENERIC_WORDS = new Set(["raw", "whole", "fresh", "regular", "plain"]);
 
 // Filler in USDA descriptions that says nothing about which food it is.
 const FILLER_WORDS = new Set([

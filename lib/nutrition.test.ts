@@ -6,6 +6,7 @@ import {
 import {
   ingredientAmount,
   ingredientGrams,
+  lookupName,
   recipeNutrition,
   roundNutrients,
   type FoodNutrition,
@@ -177,6 +178,22 @@ describe("recipeNutrition", () => {
 
   it("needs a positive number of servings", () => {
     expect(() => recipeNutrition([], 0)).toThrow();
+  });
+});
+
+describe("lookupName", () => {
+  it("looks a canned food up as canned", () => {
+    expect(lookupName(parsed("1 (15 oz) can black beans, drained"))).toBe(
+      "canned black beans",
+    );
+    expect(lookupName(parsed("2 x 400g tins chopped tomatoes"))).toBe(
+      "canned chopped tomatoes",
+    );
+  });
+
+  it("leaves other foods and already-canned ones alone", () => {
+    expect(lookupName(parsed("1 cup black beans"))).toBe("black beans");
+    expect(lookupName(parsed("1 can canned corn"))).toBe("canned corn");
   });
 });
 

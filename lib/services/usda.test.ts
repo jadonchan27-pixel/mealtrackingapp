@@ -239,6 +239,81 @@ describe("createUsdaClient", () => {
     expect(fetch).toHaveBeenCalledTimes(6);
   });
 
+  it("borrows only whole-item sizes from a different variety", async () => {
+    const cheddar = { fdcId: 328637, description: "Cheese, cheddar" };
+    const parmesan = {
+      fdcId: 171247,
+      description: "Cheese, parmesan, grated",
+      foodPortions: [
+        { amount: 1, modifier: "cup", gramWeight: 100 },
+        { amount: 1, modifier: "oz", gramWeight: 28.35 },
+      ],
+    };
+    const string = {
+      fdcId: 170851,
+      description: "Cheese, mozzarella, string",
+      foodPortions: [
+        { amount: 1, modifier: "cup, shredded", gramWeight: 112 },
+        { amount: 1, modifier: "each", gramWeight: 28 },
+      ],
+    };
+    const fetch = vi
+      .fn()
+      .mockResolvedValueOnce(
+        jsonResponse({
+          foods: [{ fdcId: 328637, description: "Cheese, cheddar" }],
+        }),
+      )
+      .mockResolvedValueOnce(jsonResponse(cheddar))
+      .mockResolvedValueOnce(
+        jsonResponse({
+          foods: [
+            { fdcId: 171247, description: "Cheese, parmesan, grated" },
+            { fdcId: 170851, description: "Cheese, mozzarella, string" },
+          ],
+        }),
+      )
+      .mockResolvedValueOnce(jsonResponse(parmesan))
+      .mockResolvedValueOnce(jsonResponse(string));
+    const usda = createUsdaClient({ apiKey: "k", fetch });
+
+    const food = await usda.findFood("cheddar cheese");
+
+    expect(food?.gramsPerUnit).toEqual({ each: 28 });
+  });
+
+  it("borrows every portion from the plain form of the same food", async () => {
+    const onion = { fdcId: 790646, description: "Onions, yellow, raw" };
+    const legacyOnion = {
+      fdcId: 170000,
+      description: "Onions, raw",
+      foodPortions: [
+        { amount: 1, modifier: "cup, chopped", gramWeight: 160 },
+        { amount: 1, modifier: 'medium (2-1/2" dia)', gramWeight: 110 },
+      ],
+    };
+    const fetch = vi
+      .fn()
+      .mockResolvedValueOnce(
+        jsonResponse({
+          foods: [{ fdcId: 790646, description: "Onions, yellow, raw" }],
+        }),
+      )
+      .mockResolvedValueOnce(jsonResponse(onion))
+      .mockResolvedValueOnce(jsonResponse({ foods: [] }))
+      .mockResolvedValueOnce(
+        jsonResponse({
+          foods: [{ fdcId: 170000, description: "Onions, raw" }],
+        }),
+      )
+      .mockResolvedValueOnce(jsonResponse(legacyOnion));
+    const usda = createUsdaClient({ apiKey: "k", fetch });
+
+    const food = await usda.findFood("yellow onion");
+
+    expect(food?.gramsPerUnit).toEqual({ cup: 160, medium: 110 });
+  });
+
   it("doesn't search again when the match has whole-item sizes", async () => {
     const fetch = vi
       .fn()
@@ -304,6 +379,14 @@ describe("bestMatch", () => {
       r(170027, "Potatoes, russet, flesh and skin, raw"),
     ];
     expect(bestMatch("russet potatoes", results)?.fdcId).toBe(170027);
+  });
+
+  it("prefers canned beans when the line says canned", () => {
+    const results = [
+      r(173735, "Beans, black, mature seeds, raw"),
+      r(175188, "Beans, black, mature seeds, canned, low sodium"),
+    ];
+    expect(bestMatch("canned black beans", results)?.fdcId).toBe(175188);
   });
 
   it("prefers cheddar when the line says cheddar", () => {

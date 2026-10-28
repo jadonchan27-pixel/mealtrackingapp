@@ -227,9 +227,17 @@ export async function nutritionForRecipe(
     const ingredient = parseIngredient(line);
     const food =
       ingredient.status === "parsed" && ingredient.quantity !== null
-        ? await lookup(ingredient.food)
+        ? await lookup(lookupName(ingredient))
         : null;
     items.push({ ingredient, food });
   }
   return { ...recipeNutrition(items, servings), items };
+}
+
+// The name to look a food up by. A can means canned food: "1 (15 oz) can
+// black beans" is cooked beans, not the dry ones USDA lists as raw.
+export function lookupName(ingredient: ParsedIngredient): string {
+  const canned =
+    ingredient.unit === "can" && !/\bcanned\b/i.test(ingredient.food);
+  return canned ? `canned ${ingredient.food}` : ingredient.food;
 }
