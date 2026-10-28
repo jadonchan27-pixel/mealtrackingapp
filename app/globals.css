@@ -5,6 +5,8 @@
   --muted: #5d665f;
   --border: #dfe4e0;
   --accent: #2f7d4f;
+  --series-trend: #2f7d4f;
+  --series-weight: #3a6fc4;
   --nav-height: 64px;
   color-scheme: light dark;
 }
@@ -17,6 +19,8 @@
     --muted: #a3ada6;
     --border: #2d342f;
     --accent: #5cc184;
+    --series-trend: #3fa36c;
+    --series-weight: #5e8ad6;
   }
 }
 
@@ -300,5 +304,97 @@ button:disabled {
 @media (min-width: 768px) {
   .profile-layout {
     grid-template-columns: minmax(0, 3fr) minmax(0, 2fr);
+  }
+}
+
+/* Weight page */
+
+.weight-layout {
+  display: grid;
+  gap: 16px;
+  align-items: start;
+}
+
+.weight-inputs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0 16px;
+}
+
+.weight-inputs .field {
+  flex: 1 1 10rem;
+}
+
+.chart {
+  margin: 0 -4px 12px;
+}
+
+.chart-legend {
+  display: flex;
+  gap: 16px;
+  margin: 0 0 8px;
+  padding: 0 4px;
+  list-style: none;
+  color: var(--muted);
+  font-size: 0.8125rem;
+}
+
+.chart-legend li {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.legend-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--series-weight);
+}
+
+.legend-line {
+  width: 14px;
+  height: 2px;
+  border-radius: 1px;
+  background: var(--series-trend);
+}
+
+.chart-tooltip {
+  padding: 8px 10px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--bg);
+  color: var(--text);
+  font-size: 0.875rem;
+  box-shadow: 0 2px 8px rgb(0 0 0 / 0.12);
+}
+
+.weigh-ins {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.9375rem;
+}
+
+.weigh-ins th,
+.weigh-ins td {
+  padding: 6px 4px;
+  border-bottom: 1px solid var(--border);
+  text-align: right;
+}
+
+.weigh-ins th:first-child,
+.weigh-ins td:first-child {
+  text-align: left;
+}
+
+.weigh-ins th {
+  color: var(--muted);
+  font-weight: 600;
+  font-size: 0.8125rem;
+}
+
+@media (min-width: 768px) {
+  .weight-layout {
+    grid-template-columns: minmax(0, 2fr) minmax(0, 3fr);
   }
 }
