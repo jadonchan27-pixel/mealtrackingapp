@@ -3,6 +3,7 @@
 
 import { describe, expect, it } from "vitest";
 import { planDailyTotals } from "@/components/FinalWeek";
+import { batchesForWeek } from "@/lib/batches";
 import { finalizeWeek, loadWeek, weekDates } from "@/lib/plans";
 import { KCAL_TOLERANCE } from "@/lib/scaling";
 import { fakeRecipeTables } from "@/tests/helpers/fakeRecipeTables";
@@ -159,5 +160,48 @@ describe("finalizeWeek", () => {
       finalizeWeek(db.client, 1, { kcal: 2900, proteinG: 150 }),
     ).rejects.toMatchObject({ status: 409 });
     expect(db.table("log_entries")).toHaveLength(28);
+  });
+});
+
+// Build step 14 "done when": batch quantities match servings per day × days.
+describe("batchesForWeek", () => {
+  it("scales every recipe to servings per day × 4 and × 3", async () => {
+    const db = draftWeek(ALL_PICKED);
+    db.table("recipe_ingredients").push(
+      { id: 1, recipe_id: 3, raw_text: "2 lb ground beef", grams: 907 },
+      { id: 2, recipe_id: 3, raw_text: "1 cup rice", grams: 185 },
+    );
+    const week = await finalizeWeek(db.client, 1, {
+      kcal: 2900,
+      proteinG: 150,
+    });
+    const [sunday, thursday] = await batchesForWeek(db.client, week);
+
+    for (const [batch, days] of [
+      [sunday, 4],
+      [thursday, 3],
+    ] as const) {
+      expect(batch.recipes.map((r) => r.slot)).toEqual([
+        "breakfast",
+        "lunch",
+        "dinner",
+        "snack",
+      ]);
+      for (const r of batch.recipes) {
+        const item = week.items.find((i) => i.slot === r.slot)!;
+        expect(r.servings).toBe(item.servingsPerDay * days);
+        expect(r.factor).toBe((item.servingsPerDay * days) / 4);
+      }
+      const dinner = batch.recipes.find((r) => r.slot === "dinner")!;
+      expect(dinner.ingredients[0].grams).toBe(Math.round(907 * dinner.factor));
+    }
+  });
+
+  it("needs a finalized week", async () => {
+    const db = draftWeek(ALL_PICKED);
+    const week = (await loadWeek(db.client, "2026-11-01"))!;
+    await expect(batchesForWeek(db.client, week)).rejects.toMatchObject({
+      status: 409,
+    });
   });
 });
