@@ -320,6 +320,7 @@ describe("GET /api/weeks/:id/shopping-list", () => {
               priceCents: 50,
               batch: "both",
               checked: false,
+              estimate: true,
             },
           ],
         },

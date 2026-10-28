@@ -61,7 +61,8 @@ export function packagesFor(neededGrams: number, packageGrams: number): number {
 }
 
 // One line per product. Foods sharing a product (green onions and scallions)
-// are added together. A food's line notes which batches use it.
+// are added together, priced by a corrected product when any of them has
+// one. A line notes which batches use it.
 export function buildShoppingList(
   recipes: readonly ShoppingRecipe[],
   foods: readonly ShoppingFood[],
@@ -98,6 +99,10 @@ export function buildShoppingList(
           batches: new Set(),
         };
         byProduct.set(key, acc);
+      } else if (acc.product.is_estimate && !product.is_estimate) {
+        acc.product = product;
+        acc.line.foodId = foodId;
+        acc.line.hebProductId = product.id;
       }
       for (const b of BATCHES) {
         const perBatch =
@@ -149,6 +154,8 @@ export type ShoppingItemView = {
   priceCents: number;
   batch: Batch;
   checked: boolean;
+  // False once Jadon has entered what this product really costs.
+  estimate: boolean;
 };
 
 export type ShoppingList = {
@@ -160,9 +167,27 @@ export type ShoppingList = {
   totalCents: number;
 };
 
+export function itemView(
+  r: ShoppingListItemRow,
+  correctedProductIds: ReadonlySet<number> = new Set(),
+): ShoppingItemView {
+  return {
+    id: r.id,
+    name: r.name,
+    neededGrams: Number(r.needed_grams),
+    packages: r.packages,
+    priceCents: r.price_cents,
+    batch: r.batch,
+    checked: r.checked,
+    estimate:
+      r.heb_product_id === null || !correctedProductIds.has(r.heb_product_id),
+  };
+}
+
 // Rows grouped by section in store order, names A to Z, with the total.
 export function groupShoppingList(
   rows: readonly ShoppingListItemRow[],
+  correctedProductIds: ReadonlySet<number> = new Set(),
 ): ShoppingList {
   const sections = SECTION_ORDER.map((section) => ({
     section,
@@ -170,15 +195,7 @@ export function groupShoppingList(
     items: rows
       .filter((r) => r.section === section)
       .sort((a, b) => a.name.localeCompare(b.name))
-      .map((r) => ({
-        id: r.id,
-        name: r.name,
-        neededGrams: Number(r.needed_grams),
-        packages: r.packages,
-        priceCents: r.price_cents,
-        batch: r.batch,
-        checked: r.checked,
-      })),
+      .map((r) => itemView(r, correctedProductIds)),
   })).filter((s) => s.items.length > 0);
   return {
     sections,
@@ -314,5 +331,132 @@ export async function shoppingListForWeek(
     await writeShoppingList(supabase, week.id);
     rows = await read();
   }
-  return groupShoppingList(rows);
+  return groupShoppingList(rows, await correctedIds(supabase, rows));
+}
+
+// The rows' products whose price Jadon has corrected.
+async function correctedIds(
+  supabase: Supabase,
+  rows: readonly Pick<ShoppingListItemRow, "heb_product_id">[],
+): Promise<Set<number>> {
+  const ids = [
+    ...new Set(
+      rows
+        .map((r) => r.heb_product_id)
+        .filter((id): id is number => id !== null),
+    ),
+  ];
+  if (ids.length === 0) return new Set();
+  const products =
+    check(
+      await supabase
+        .from("heb_products")
+        .select("id, is_estimate")
+        .in("id", ids),
+    ) ?? [];
+  return new Set(products.filter((p) => !p.is_estimate).map((p) => p.id));
+}
+
+export type ShoppingItemPatch = {
+  checked?: boolean;
+  // What the line really cost, all its packages together.
+  actualPriceCents?: number;
+};
+
+// `{ checked }` and/or `{ actualPriceCents }` (whole cents, up to $1,000).
+export function parseShoppingPatch(
+  body: unknown,
+): { ok: true; patch: ShoppingItemPatch } | { ok: false; error: string } {
+  if (typeof body !== "object" || body === null) {
+    return { ok: false, error: "Send { checked } or { actualPriceCents }." };
+  }
+  const { checked, actualPriceCents } = body as Record<string, unknown>;
+  const patch: ShoppingItemPatch = {};
+  if (checked !== undefined) {
+    if (typeof checked !== "boolean") {
+      return { ok: false, error: "checked must be true or false." };
+    }
+    patch.checked = checked;
+  }
+  if (actualPriceCents !== undefined) {
+    if (
+      typeof actualPriceCents !== "number" ||
+      !Number.isInteger(actualPriceCents) ||
+      actualPriceCents < 0 ||
+      actualPriceCents > 100_000
+    ) {
+      return {
+        ok: false,
+        error: "The price paid must be between $0 and $1,000.",
+      };
+    }
+    patch.actualPriceCents = actualPriceCents;
+  }
+  if (Object.keys(patch).length === 0) {
+    return { ok: false, error: "Send { checked } or { actualPriceCents }." };
+  }
+  return { ok: true, patch };
+}
+
+export class ShoppingItemNotFound extends Error {
+  name = "ShoppingItemNotFound";
+}
+
+// US-19: checks an item off, and/or records what it really cost. A price
+// paid sets the line's price and becomes its product's price per package
+// (`is_estimate` false), so later weeks use it. Other estimated products
+// with the same name and package, from foods sharing the line, get it too.
+export async function updateShoppingItem(
+  supabase: Supabase,
+  id: number,
+  patch: ShoppingItemPatch,
+): Promise<ShoppingItemView> {
+  const row = check(
+    await supabase
+      .from("shopping_list_items")
+      .select("*")
+      .eq("id", id)
+      .maybeSingle(),
+  );
+  if (!row) throw new ShoppingItemNotFound("Item not found");
+
+  const changes: Partial<ShoppingListItemRow> = {};
+  if (patch.checked !== undefined) changes.checked = patch.checked;
+  if (patch.actualPriceCents !== undefined) {
+    changes.price_cents = patch.actualPriceCents;
+    if (row.heb_product_id !== null) {
+      const product = check(
+        await supabase
+          .from("heb_products")
+          .select("*")
+          .eq("id", row.heb_product_id)
+          .maybeSingle(),
+      );
+      if (product) {
+        const corrected = {
+          price_cents: Math.round(patch.actualPriceCents / row.packages),
+          is_estimate: false,
+        };
+        check(
+          await supabase
+            .from("heb_products")
+            .update(corrected)
+            .eq("id", product.id),
+        );
+        check(
+          await supabase
+            .from("heb_products")
+            .update(corrected)
+            .eq("name", product.name)
+            .eq("package_grams", product.package_grams)
+            .eq("is_estimate", true),
+        );
+      }
+    }
+  }
+  check(
+    await supabase.from("shopping_list_items").update(changes).eq("id", id),
+  );
+  const updated = { ...row, ...changes };
+  return itemView(updated, await correctedIds(supabase, [updated]));
 }
