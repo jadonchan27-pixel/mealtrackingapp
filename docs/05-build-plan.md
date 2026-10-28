@@ -159,16 +159,18 @@ Status: ☐ not started · ◐ in progress · ☑ done and validated
 
 ## Phase 6: Daily logging
 
-### ◐ Step 18. Today page (US-20 to US-23, TR-18)
+### ☑ Step 18. Today page (US-20 to US-23, TR-18)
 1. `GET /api/log?date=` with entries and confirmed totals.
 2. `PATCH /api/log/:id` for status and portion. Status can go back to planned (undo); portions are in quarters, ¼ to 10.
 3. Today page: each slot with tap-to-confirm, change portion, mark skipped; running totals vs targets.
 
 **Done when:** only confirmed items count toward totals.
 
-### ☐ Step 19. Eating out, manual (US-24, US-25)
-1. `POST /api/log/restaurant`: marks the planned entry skipped and adds a restaurant entry.
+### ◐ Step 19. Eating out, manual (US-24, US-25)
+1. `POST /api/log/restaurant`: marks the planned entry skipped and adds a restaurant entry, confirmed. Its calories and macros are for the whole item; the amount eaten is its portion.
 2. Form on the Today page: restaurant, item, amount eaten, calories, protein, carbs, fat.
+3. `DELETE /api/log/:id` removes a restaurant entry and puts the planned meal back to planned. While a slot has an eat-out, its planned meal stays skipped (no undo or confirm), so the two never both count.
+4. Follow-ups from step 14b: the Start over warning counts each logged meal slot once, and re-finalizing a week keeps a slot that was eaten out as skipped.
 
 **Done when:** the restaurant item replaces the planned meal in the day's totals.
 
