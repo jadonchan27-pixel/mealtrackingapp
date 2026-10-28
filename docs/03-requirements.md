@@ -45,6 +45,7 @@ _Builds on [01-project-plan.md](01-project-plan.md) and the step 2 facet docs (`
 - **US-12** As Jadon, I can see batch cooking instructions with quantities for the Sunday batch (Sun–Wed) and Thursday batch (Thu–Sat).
 - **US-13** As Jadon, every recipe has at most 1 hour active cooking time and the selection favors low cost.
 - **US-14** As Jadon, each new week's recipes are different from the previous week's.
+- **US-29** As Jadon, I can start a week's plan over (e.g. I don't want Mexican after all): its shortlist, picks and any finalized plan are cleared and I choose cuisines again. The app asks me to confirm first and warns me if I've already logged meals that week.
 
 ### Shopping list
 - **US-15** As Jadon, after finalizing the plan I get one shopping list for the week, including staples.
@@ -90,6 +91,7 @@ _Builds on [01-project-plan.md](01-project-plan.md) and the step 2 facet docs (`
 - **TR-12** Portion scaling: meals split ~80% of calories evenly across breakfast, lunch and dinner; snacks ~20% as 1–2 servings; solve servings to get close to calorie and protein targets.
 - **TR-13** Exclude recipes used in the previous week.
 - **TR-14** Batch quantities for 4 days (Sunday batch) and 3 days (Thursday batch).
+- **TR-23** Starting a week over deletes its week plan, candidates, plan items, shopping list and planned log entries (confirmed or skipped ones too). Restaurant log entries are kept. A week whose plan has logged meals (confirmed, skipped or restaurant) reports how many, so the confirm can warn.
 
 ### Shopping and pricing
 - **TR-15** Ingredient aggregation across recipes with unit conversion.

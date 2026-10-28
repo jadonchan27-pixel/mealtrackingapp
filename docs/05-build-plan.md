@@ -115,11 +115,17 @@ Status: ☐ not started · ◐ in progress · ☑ done and validated
 
 **Done when:** a finalized plan's daily totals are within 5% of the calorie target.
 
-### ◐ Step 14. Batch cooking view (US-12, TR-14)
+### ☑ Step 14. Batch cooking view (US-12, TR-14)
 1. `GET /api/weeks/:id/batches`: per-recipe quantities for the Sunday batch (×4 days) and Thursday batch (×3 days).
 2. Batch page: each recipe with scaled ingredients and steps, for each batch.
 
 **Done when:** batch quantities match servings per day × days.
+
+### ◐ Step 14b. Start a week over (US-29, TR-23)
+1. `resetWeek` in `lib/plans.ts` and `POST /api/weeks/:id/reset`: delete the week's planned log entries, plan items, shopping list, candidates and the week itself. Week views carry `loggedMeals`, the count of logged meals that would be affected.
+2. Plan page: "Start over" on the draft shortlist and the finalized week, with a confirm that warns when `loggedMeals` > 0. After it, the cuisine picker shows.
+
+**Done when:** after starting over, the week has no candidates, plan items or planned log entries, and Jadon can pick a different cuisine and build a new shortlist.
 
 ## Phase 5: Shopping list
 
