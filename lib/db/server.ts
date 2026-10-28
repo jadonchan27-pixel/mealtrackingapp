@@ -4,10 +4,14 @@
 import "server-only";
 import { createServerClient } from "@supabase/ssr";
 import { cookies } from "next/headers";
+import { connection } from "next/server";
 import { supabaseAnonKey, supabaseUrl } from "./env";
 import type { Database } from "./types";
 
 export async function createClient() {
+  // Supabase checks token expiry with Date.now(), which Cache Components refuses
+  // while prerendering, so render anything using this client only at request time.
+  await connection();
   const cookieStore = await cookies();
 
   return createServerClient<Database>(supabaseUrl(), supabaseAnonKey(), {
