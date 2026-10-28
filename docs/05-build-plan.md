@@ -39,7 +39,7 @@ Status: ☐ not started · ◐ in progress · ☑ done and validated
 
 **Done when:** Jadon can sign in; another Google account is refused.
 
-### ◐ Step 4. App shell and PWA (US-3, TR-1, TR-2)
+### ☑ Step 4. App shell and PWA (US-3, TR-1, TR-2)
 1. Responsive layout with navigation: Today, Plan, Shopping, Weight, Profile.
 2. Web app manifest and icons.
 3. Basic service worker so the app can be installed (no offline data yet).
@@ -48,7 +48,7 @@ Status: ☐ not started · ◐ in progress · ☑ done and validated
 
 ## Phase 2: Profile, targets and weight
 
-### ☐ Step 5. Targets logic (US-5, TR-10, TR-20)
+### ◐ Step 5. Targets logic (US-5, TR-10, TR-20)
 1. `lib/units.ts`: lb↔kg, ft/in↔cm, and cooking unit conversions, with tests.
 2. `lib/targets.ts`: BMR, TDEE, +300 surplus, protein, fat and carbs, with tests against worked examples.
 
