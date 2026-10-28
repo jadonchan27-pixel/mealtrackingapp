@@ -100,7 +100,7 @@ Status: ☐ not started · ◐ in progress · ☑ done and validated
 
 ## Phase 4: Weekly plan
 
-### ◐ Step 12. Draft plan and shortlist (US-7 to US-10)
+### ☑ Step 12. Draft plan and shortlist (US-7 to US-10)
 1. `POST /api/weeks`, `GET /api/weeks/:weekStart`, `POST /api/weeks/:id/candidates` (one slot per request), `PATCH /api/candidates/:id`.
 2. If no cuisine is given, the app picks one not used last week.
 3. Plan page: choose cuisines for the coming week, run the search slot by slot, show 3 candidates per slot (photo, time, nutrition, ingredients), select or swap.
@@ -108,7 +108,7 @@ Status: ☐ not started · ◐ in progress · ☑ done and validated
 
 **Done when:** Jadon can build a full shortlist and pick one recipe per slot.
 
-### ☐ Step 13. Portion scaling and finalize (US-11, TR-12)
+### ◐ Step 13. Portion scaling and finalize (US-11, TR-12)
 1. `lib/scaling.ts`: servings per day per slot (80/20 split, 0.25 rounding, protein top-up), with tests.
 2. `POST /api/weeks/:id/finalize`: writes `plan_items` and a `log_entries` row for every day and slot (Sunday to Saturday).
 3. Plan page shows the finalized week with daily totals vs targets.
