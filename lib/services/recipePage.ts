@@ -54,7 +54,8 @@ export async function fetchRecipePage(
 }
 
 // Reads the first schema.org Recipe in the page's JSON-LD. A recipe needs a
-// title and at least one ingredient; anything less counts as no recipe.
+// title and at least one ingredient, and mustn't be a roundup; anything else
+// counts as no recipe.
 export function extractRecipe(html: string, url: string): RecipePage | null {
   for (const data of jsonLdBlocks(html)) {
     const node = findRecipe(data);
@@ -62,7 +63,7 @@ export function extractRecipe(html: string, url: string): RecipePage | null {
 
     const title = text(node.name);
     const ingredients = textList(node.recipeIngredient ?? node.ingredients);
-    if (title === "" || ingredients.length === 0) continue;
+    if (title === "" || ingredients.length === 0 || isRoundup(title)) continue;
 
     // A zero time ("PT0M") means the site left it blank.
     const prepMinutes = durationMinutes(node.prepTime) || null;
@@ -86,6 +87,13 @@ export function extractRecipe(html: string, url: string): RecipePage | null {
     };
   }
   return null;
+}
+
+// Roundup articles ("30+ Indian Dinner Recipes", "Easy Dinner Ideas")
+// sometimes carry one recipe's data; their title gives them away, while a
+// single recipe's title says "Recipe" at most.
+export function isRoundup(title: string): boolean {
+  return /\b(recipes|ideas)\b/i.test(title);
 }
 
 type JsonNode = Record<string, unknown>;

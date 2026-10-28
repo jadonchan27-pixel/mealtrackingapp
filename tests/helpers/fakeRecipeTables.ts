@@ -4,29 +4,48 @@ import type { Database, RecipeIngredientRow, RecipeRow } from "@/lib/db/types";
 type Row = Record<string, unknown>;
 type Result = { data: unknown; error: { message: string } | null };
 
-// An in-memory stand-in for the recipes and recipe_ingredients tables that
-// supports the queries saveRecipeFromUrl makes: select with eq filters,
-// insert (optionally returning the row) and delete with eq filters.
+const TABLES = [
+  "recipes",
+  "recipe_ingredients",
+  "heb_products",
+  "week_plans",
+  "plan_items",
+] as const;
+
+// An in-memory stand-in for the recipe tables (and the tables recipe search
+// reads) that supports the queries the app makes: select with eq/in filters,
+// insert (optionally returning the row), update and delete.
 export function fakeRecipeTables({
   failIngredientInsert = false,
-}: { failIngredientInsert?: boolean } = {}) {
-  const tables: Record<string, Row[]> = { recipes: [], recipe_ingredients: [] };
-  let nextId = 1;
+  seed = {},
+}: {
+  failIngredientInsert?: boolean;
+  seed?: Partial<Record<(typeof TABLES)[number], Row[]>>;
+} = {}) {
+  const tables: Record<string, Row[]> = Object.fromEntries(
+    TABLES.map((t) => [t, [...(seed[t] ?? [])]]),
+  );
+  let nextId = 1000;
 
   const client = {
     from(table: string) {
       if (!(table in tables)) throw new Error(`unexpected table ${table}`);
-      const filters: [string, unknown][] = [];
-      let op: "select" | "insert" | "delete" = "select";
+      const filters: ((r: Row) => boolean)[] = [];
+      let op: "select" | "insert" | "update" | "delete" = "select";
       let inserted: Row[] = [];
+      let changes: Row = {};
       let error: Result["error"] = null;
       const matches = () =>
-        tables[table].filter((r) => filters.every(([k, v]) => r[k] === v));
+        tables[table].filter((r) => filters.every((f) => f(r)));
 
       const builder = {
         select: () => builder,
         eq(column: string, value: unknown) {
-          filters.push([column, value]);
+          filters.push((r) => r[column] === value);
+          return builder;
+        },
+        in(column: string, values: unknown[]) {
+          filters.push((r) => values.includes(r[column]));
           return builder;
         },
         insert(rows: Row | Row[]) {
@@ -45,6 +64,11 @@ export function fakeRecipeTables({
           tables[table].push(...inserted);
           return builder;
         },
+        update(values: Row) {
+          op = "update";
+          changes = values;
+          return builder;
+        },
         delete() {
           op = "delete";
           return builder;
@@ -59,6 +83,9 @@ export function fakeRecipeTables({
             if (op === "delete") {
               const gone = matches();
               tables[table] = tables[table].filter((r) => !gone.includes(r));
+            }
+            if (op === "update") {
+              for (const r of matches()) Object.assign(r, changes);
             }
             resolve({ data: op === "select" ? matches() : null, error });
           } catch (e) {

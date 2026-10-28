@@ -4,6 +4,7 @@ import {
   durationMinutes,
   extractRecipe,
   fetchRecipePage,
+  isRoundup,
   RecipePageError,
 } from "./recipePage";
 
@@ -208,6 +209,29 @@ describe("extractRecipe on messy real-world JSON-LD", () => {
       "Rinse.",
       "Simmer.",
     ]);
+  });
+});
+
+describe("isRoundup", () => {
+  it.each([
+    "30+ Indian & Pakistani Dinner Recipes, Including Authentic Chicken Curry",
+    "Indian Dinner Ideas (Impossibly-Delicious, Easy Recipes)",
+    "Vegetarian Indian Dinner Recipes | Simple Dinner Ideas",
+  ])("spots %s", (title) => {
+    expect(isRoundup(title)).toBe(true);
+  });
+
+  it.each([
+    "Indian Butter Chicken Recipe",
+    "30 Minute Spicy Coconut Butter Chicken",
+    "Best Lentil Soup",
+  ])("keeps %s", (title) => {
+    expect(isRoundup(title)).toBe(false);
+  });
+
+  it("makes a roundup page count as no recipe", () => {
+    const html = `<script type="application/ld+json">{"@type":"Recipe","name":"52 Indian Recipes","recipeIngredient":["1 cup rice"]}</script>`;
+    expect(extractRecipe(html, "https://x.test/")).toBeNull();
   });
 });
 
