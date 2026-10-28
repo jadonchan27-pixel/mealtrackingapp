@@ -11,7 +11,9 @@
     "format:check": "prettier --check .",
     "test": "vitest run",
     "test:watch": "vitest",
-    "typecheck": "next typegen && tsc --noEmit"
+    "typecheck": "next typegen && tsc --noEmit",
+    "smoke:login": "node e2e/login.mjs",
+    "smoke": "node e2e/smoke.mjs"
   },
   "dependencies": {
     "@supabase/ssr": "^0.12.7",
@@ -29,6 +31,7 @@
     "eslint": "^9",
     "eslint-config-next": "16.4.3",
     "eslint-config-prettier": "^10.1.8",
+    "playwright": "1.63.0",
     "prettier": "^3.9.10",
     "typescript": "^5",
     "vitest": "^5.0.5"
