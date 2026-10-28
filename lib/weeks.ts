@@ -49,11 +49,23 @@ export function isSunday(iso: string): boolean {
   return isIsoDate(iso) && utcDate(iso).getUTCDay() === 0;
 }
 
+// Today in Austin as YYYY-MM-DD.
+export function austinToday(now: Date): string {
+  return now.toLocaleDateString("en-CA", { timeZone: "America/Chicago" });
+}
+
 // The week being planned: today when it's Sunday, else the coming Sunday
 // (planning happens on Saturday for the week from Sunday).
 export function upcomingWeekStart(today: string): string {
   const d = utcDate(today);
   d.setUTCDate(d.getUTCDate() + ((7 - d.getUTCDay()) % 7));
+  return d.toISOString().slice(0, 10);
+}
+
+// The week under way: the Sunday on or before `today`.
+export function currentWeekStart(today: string): string {
+  const d = utcDate(today);
+  d.setUTCDate(d.getUTCDate() - d.getUTCDay());
   return d.toISOString().slice(0, 10);
 }
 

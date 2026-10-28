@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   CUISINE_OPTIONS,
+  currentWeekStart,
   isMealSlot,
   isSunday,
   parseNewWeek,
@@ -14,6 +15,14 @@ describe("upcomingWeekStart", () => {
     expect(upcomingWeekStart("2026-10-28")).toBe("2026-11-01"); // Wednesday
     expect(upcomingWeekStart("2026-11-01")).toBe("2026-11-01"); // Sunday
     expect(upcomingWeekStart("2026-12-28")).toBe("2027-01-03");
+  });
+});
+
+describe("currentWeekStart", () => {
+  it("is the Sunday on or before today", () => {
+    expect(currentWeekStart("2026-11-05")).toBe("2026-11-01"); // Thursday
+    expect(currentWeekStart("2026-11-01")).toBe("2026-11-01");
+    expect(currentWeekStart("2027-01-02")).toBe("2026-12-27");
   });
 });
 

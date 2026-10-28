@@ -108,14 +108,14 @@ Status: ☐ not started · ◐ in progress · ☑ done and validated
 
 **Done when:** Jadon can build a full shortlist and pick one recipe per slot.
 
-### ◐ Step 13. Portion scaling and finalize (US-11, TR-12)
+### ☑ Step 13. Portion scaling and finalize (US-11, TR-12)
 1. `lib/scaling.ts`: servings per day per slot (80/20 split, 0.25 rounding, protein top-up), with tests.
 2. `POST /api/weeks/:id/finalize`: writes `plan_items` and a `log_entries` row for every day and slot (Sunday to Saturday).
 3. Plan page shows the finalized week with daily totals vs targets.
 
 **Done when:** a finalized plan's daily totals are within 5% of the calorie target.
 
-### ☐ Step 14. Batch cooking view (US-12, TR-14)
+### ◐ Step 14. Batch cooking view (US-12, TR-14)
 1. `GET /api/weeks/:id/batches`: per-recipe quantities for the Sunday batch (×4 days) and Thursday batch (×3 days).
 2. Batch page: each recipe with scaled ingredients and steps, for each batch.
 
