@@ -78,12 +78,20 @@ export function createUsdaClient(options: UsdaClientOptions = {}) {
     query: string,
     dataTypes: readonly string[] = DATA_TYPES,
   ): Promise<number | null> {
+    return (await searchRanked(query, dataTypes))[0]?.fdcId ?? null;
+  }
+
+  // Every result, best match first.
+  async function searchRanked(
+    query: string,
+    dataTypes: readonly string[],
+  ): Promise<SearchResult[]> {
     const json = (await get("/foods/search", {
       query,
       dataType: dataTypes.join(","),
       pageSize: "25",
     })) as { foods?: SearchResult[] };
-    return bestMatch(query, json.foods ?? [])?.fdcId ?? null;
+    return rankMatches(query, json.foods ?? []);
   }
 
   async function getFood(fdcId: number): Promise<UsdaFood> {
@@ -91,29 +99,71 @@ export function createUsdaClient(options: UsdaClientOptions = {}) {
   }
 
   // Foundation foods often list no whole-item portions, so "2 large eggs" or
-  // "1 onion" couldn't be weighed. Then the missing portions come from the
-  // best SR Legacy match; the food's own portions win where both have one.
+  // "1 onion" couldn't be weighed. Then the missing portions come from SR
+  // Legacy: the best few matches for the line, then for its last word
+  // ("onion" for "yellow onion"), until one weighs a whole item. The food's
+  // own portions win where both have one.
   async function findFood(query: string): Promise<UsdaFood | null> {
     const fdcId = await search(query);
     if (fdcId === null) return null;
     const food = await getFood(fdcId);
-    if (WHOLE_ITEM_SIZES.some((k) => food.gramsPerUnit[k] !== undefined)) {
-      return food;
-    }
+    if (hasWholeItemSize(food)) return food;
 
-    const legacyId = await search(query, ["SR Legacy"]);
-    if (legacyId === null || legacyId === fdcId) return food;
-    const legacy = await getFood(legacyId);
-    return {
-      ...food,
-      gramsPerUnit: { ...legacy.gramsPerUnit, ...food.gramsPerUnit },
-    };
+    const tried = new Set([fdcId]);
+    let fallback: UsdaFood | null = null;
+    let fetches = 0;
+    for (const q of legacyQueries(query)) {
+      const head = headNoun(q);
+      for (const result of await searchRanked(q, ["SR Legacy"])) {
+        if (fetches >= MAX_LEGACY_FETCHES) break;
+        if (tried.has(result.fdcId)) continue;
+        if (words(result.description)[0] !== head) continue;
+        tried.add(result.fdcId);
+        fetches++;
+        const legacy = await getFood(result.fdcId);
+        fallback ??= legacy;
+        if (hasWholeItemSize(legacy)) {
+          return withPortionsFrom(food, legacy);
+        }
+      }
+    }
+    return fallback === null ? food : withPortionsFrom(food, fallback);
   }
 
   return { search, getFood, findFood };
 }
 
 export type UsdaClient = ReturnType<typeof createUsdaClient>;
+
+// SR Legacy foods fetched at most when borrowing whole-item sizes.
+const MAX_LEGACY_FETCHES = 4;
+
+function hasWholeItemSize(food: UsdaFood): boolean {
+  return WHOLE_ITEM_SIZES.some((k) => food.gramsPerUnit[k] !== undefined);
+}
+
+function withPortionsFrom(food: UsdaFood, legacy: UsdaFood): UsdaFood {
+  return {
+    ...food,
+    gramsPerUnit: { ...legacy.gramsPerUnit, ...food.gramsPerUnit },
+  };
+}
+
+function wantedWords(query: string): string[] {
+  const wanted = words(query).filter((w) => !IGNORED_QUERY_WORDS.has(w));
+  return wanted.length > 0 ? wanted : words(query);
+}
+
+// The word that names the food: the last one ("onion" in "yellow onion").
+function headNoun(query: string): string {
+  return wantedWords(query).at(-1) ?? "";
+}
+
+// The line itself, then its head noun when that's different.
+function legacyQueries(query: string): string[] {
+  const head = headNoun(query);
+  return wantedWords(query).length > 1 && head !== "" ? [query, head] : [query];
+}
 
 // The parts of a /food/{id} response that are used.
 export type FoodDetails = {
@@ -207,7 +257,11 @@ function portionKey(
     if (head === size || head.startsWith(`${size} `))
       return size === "whole" ? "each" : size;
   }
-  return normalizeUnit(head) ?? normalizeUnit(head.split(" ")[0]);
+  const unit = normalizeUnit(head) ?? normalizeUnit(head.split(" ")[0]);
+  if (unit) return unit;
+  // Some SR Legacy foods name the item first: "potato medium (2-1/4" dia)".
+  const size = head.split(" ").find((w) => SIZE_WORDS.has(w));
+  return size === undefined ? null : size === "whole" ? "each" : size;
 }
 
 export type SearchResult = {
@@ -264,6 +318,17 @@ const SPECIFIC_WORDS = new Set([
   "frozen",
   "canned",
   "fried",
+  "sauteed",
+  "baked",
+  "boiled",
+  "roasted",
+  "steamed",
+  "stewed",
+  "braised",
+  "grilled",
+  "broiled",
+  "microwaved",
+  "mashed",
   "breaded",
   "flavored",
   "sweetened",
@@ -320,11 +385,17 @@ export function bestMatch(
   query: string,
   results: readonly SearchResult[],
 ): SearchResult | null {
-  const wanted = words(query).filter((w) => !IGNORED_QUERY_WORDS.has(w));
-  const wantedSet = new Set(wanted.length > 0 ? wanted : words(query));
-  let best: { result: SearchResult; score: number } | null = null;
+  return rankMatches(query, results)[0] ?? null;
+}
 
-  results.forEach((result, rank) => {
+// Results sorted by how well they name the ingredient, best first.
+export function rankMatches(
+  query: string,
+  results: readonly SearchResult[],
+): SearchResult[] {
+  const wantedSet = new Set(wantedWords(query));
+
+  const scored = results.map((result, rank) => {
     const desc = words(result.description);
     const descSet = new Set(desc);
     const covered = [...wantedSet].filter((w) => descSet.has(w)).length;
@@ -348,8 +419,8 @@ export function bestMatch(
     if (result.dataType === "SR Legacy") score += 3;
     score -= rank * 0.1; // USDA's order breaks remaining ties
 
-    if (!best || score > best.score) best = { result, score };
+    return { result, score };
   });
 
-  return best === null ? null : (best as { result: SearchResult }).result;
+  return scored.sort((a, b) => b.score - a.score).map((s) => s.result);
 }
