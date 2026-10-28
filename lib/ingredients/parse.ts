@@ -316,13 +316,24 @@ export function parseIngredient(raw: string): IngredientResult {
   }
 
   // Parentheses right after the unit: a package size after a count unit
-  // ("1 jar (24 oz) sauce"), otherwise an alternate measurement to drop
-  // ("2 cups (480 ml) water").
-  const alt = /^\s*\(([^)]*)\)/.exec(s);
+  // ("1 jar (24 oz) sauce"); a weight after a volume, which is more exact
+  // than the volume ("1 cup (165g) sweet potatoes" is 165 g); otherwise an
+  // alternate measurement to drop ("2 cups (480 ml) water").
+  const alt = /^\s*\(([^()]*)\)/.exec(s);
   if (unit !== null && alt) {
     const isCount = !isVolumeUnit(unit) && !isMassUnit(unit);
-    const inner = isCount && size === null ? parseMeasure(alt[1]) : null;
-    if (inner) size = inner;
+    const inner = parseMeasure(alt[1]);
+    if (isCount && size === null && inner) {
+      size = inner;
+    } else if (
+      isVolumeUnit(unit) &&
+      inner?.unit != null &&
+      isMassUnit(inner.unit) &&
+      quantityMax === null
+    ) {
+      quantity = inner.quantity;
+      unit = inner.unit;
+    }
     s = s.slice(alt[0].length);
   }
 
@@ -337,10 +348,32 @@ export function parseIngredient(raw: string): IngredientResult {
     notes.push(rest.trim().replace(/^;\s*/, ""));
   }
 
-  food = food.replace(/\(([^)]*)\)/g, (_, inner: string) => {
-    notes.push(inner.trim());
-    return " ";
-  });
+  // Innermost parentheses first, so nested ones ("((15 ounces) rinsed and
+  // drained)") come out whole. A package size inside them counts when the
+  // unit is a count: "1 can black beans ((15 ounces) drained)".
+  for (let prev = ""; prev !== food;) {
+    prev = food;
+    food = food.replace(/\(([^()]*)\)/g, (_, inner: string) => {
+      const measure =
+        unit !== null &&
+        !isVolumeUnit(unit) &&
+        !isMassUnit(unit) &&
+        size === null
+          ? parseMeasure(inner)
+          : null;
+      if (measure) size = measure;
+      else notes.push(inner.trim());
+      return " ";
+    });
+  }
+  // A parenthesis left open or closed alone ("rice (do not use…" cut short),
+  // and footnote marks ("rice*").
+  const open = food.indexOf("(");
+  if (open >= 0) {
+    notes.push(food.slice(open + 1).trim());
+    food = food.slice(0, open);
+  }
+  food = food.replace(/[)*†]/g, " ");
   for (const phrase of NOTE_PHRASES) {
     const re = new RegExp(`\\b${phrase}\\b`, "i");
     if (re.test(food)) {

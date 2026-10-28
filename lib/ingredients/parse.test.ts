@@ -120,6 +120,41 @@ describe("food and notes", () => {
     });
   });
 
+  it("takes a weight written after a volume as the amount", () => {
+    expect(parsed("1 cup (165g) diced sweet potatoes")).toMatchObject({
+      quantity: 165,
+      unit: "g",
+      food: "diced sweet potatoes",
+    });
+    // A volume in parentheses is still dropped.
+    expect(parsed("2 cups (480 ml) water")).toMatchObject({
+      quantity: 2,
+      unit: "cup",
+      food: "water",
+    });
+  });
+
+  it("handles nested and unclosed parentheses and footnote marks", () => {
+    expect(
+      parsed(
+        "1 can reduced-sodium black beans ((15 ounces) rinsed and drained)",
+      ),
+    ).toMatchObject({
+      unit: "can",
+      size: { quantity: 15, unit: "oz" },
+      food: "reduced-sodium black beans",
+      note: "rinsed and drained",
+    });
+    expect(
+      parsed("1 ½ cups instant brown rice* (do not use white minute rice"),
+    ).toMatchObject({
+      quantity: 1.5,
+      unit: "cup",
+      food: "instant brown rice",
+      note: "do not use white minute rice",
+    });
+  });
+
   it("keeps the original line", () => {
     expect(parsed("  2 eggs ").raw).toBe("  2 eggs ");
   });
