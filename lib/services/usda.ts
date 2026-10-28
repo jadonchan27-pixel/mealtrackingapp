@@ -228,17 +228,15 @@ const SPECIFIC_WORDS = new Set([
   "babyfood",
   "dried",
   "dehydrated",
+  "evaporated",
+  "condensed",
+  "dry",
   "powder",
   "powdered",
   "frozen",
   "canned",
   "fried",
   "breaded",
-  "reduced",
-  "lowfat",
-  "nonfat",
-  "fat-free",
-  "light",
   "flavored",
   "sweetened",
   "unsweetened",
@@ -250,20 +248,41 @@ const SPECIFIC_WORDS = new Set([
   "fast",
   "foods",
   "brand",
+]);
+
+// Filler in USDA descriptions that says nothing about which food it is.
+const FILLER_WORDS = new Set([
+  "a",
+  "and",
+  "with",
+  "without",
+  "added",
+  "vitamin",
+  "vitamins",
+  "d",
+  "c",
+  "fluid",
   "ns",
   "nfs",
+  "or",
+  "of",
+  "the",
+  "includes",
+  "usda",
+  "commodity",
 ]);
 
 function words(text: string): string[] {
   return text
     .toLowerCase()
-    .split(/[^a-z-]+/)
+    .split(/[^a-z0-9%-]+/)
     .filter((w) => w !== "")
     .map((w) => (w.length > 3 && /[^su]s$/.test(w) ? w.slice(0, -1) : w));
 }
 
 // Rule-based pick of the result that best names the ingredient: every query
-// word should appear, extra words cost a little, part and variety words cost
+// word should appear, the description should start with one of them, extra
+// words cost a little, part and variety words cost
 // more, raw and whole are preferred unless the line says otherwise, and SR
 // Legacy wins ties because it carries household portion weights.
 export function bestMatch(
@@ -279,9 +298,11 @@ export function bestMatch(
     const descSet = new Set(desc);
     const covered = [...wantedSet].filter((w) => descSet.has(w)).length;
     let score = (covered / Math.max(wantedSet.size, 1)) * 100;
+    // USDA names lead with what the food is ("Egg, whole" vs "Bagels, egg").
+    if (wantedSet.has(desc[0])) score += 20;
 
     for (const w of descSet) {
-      if (wantedSet.has(w)) continue;
+      if (wantedSet.has(w) || FILLER_WORDS.has(w)) continue;
       score -= SPECIFIC_WORDS.has(w) ? 15 : 2;
     }
     if (!wantedSet.has("cooked") && descSet.has("raw")) score += 4;

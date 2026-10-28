@@ -174,6 +174,27 @@ describe("bestMatch", () => {
     expect(bestMatch("egg whites", results)?.fdcId).toBe(172183);
   });
 
+  it("prefers a description that starts with the food", () => {
+    const results = [
+      r(174901, "Bagels, egg"),
+      r(747997, "Eggs, Grade A, Large, egg white", "Foundation"),
+      r(171287, "Egg, whole, raw, fresh"),
+    ];
+    expect(bestMatch("large eggs", results)?.fdcId).toBe(171287);
+  });
+
+  it("matches 2% milk to fluid milk, not evaporated", () => {
+    const results = [
+      r(171302, "Milk, evaporated, 2% fat, with added vitamin A and vitamin D"),
+      r(
+        171267,
+        "Milk, reduced fat, fluid, 2% milkfat, with added vitamin A and vitamin D",
+      ),
+      r(171265, "Milk, whole, 3.25% milkfat, with added vitamin D"),
+    ];
+    expect(bestMatch("2% milk", results)?.fdcId).toBe(171267);
+  });
+
   it("returns null for no results", () => {
     expect(bestMatch("anything", [])).toBeNull();
   });
