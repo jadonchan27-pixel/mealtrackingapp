@@ -1,0 +1,33 @@
+{
+  "fdcId": 173414,
+  "description": "Cheese, cheddar",
+  "foodNutrients": [
+    { "nutrient": { "id": 1008 }, "amount": 403 },
+    { "nutrient": { "id": 1003 }, "amount": 24.9 },
+    { "nutrient": { "id": 1004 }, "amount": 33.14 },
+    { "nutrient": { "id": 1005 }, "amount": 1.28 },
+    { "nutrient": { "id": 1079 }, "amount": 0 },
+    { "nutrient": { "id": 2000 }, "amount": 0.52 },
+    { "nutrient": { "id": 1093 }, "amount": 621 }
+  ],
+  "foodPortions": [
+    {
+      "amount": 1,
+      "modifier": "cup, shredded",
+      "gramWeight": 113,
+      "measureUnit": { "name": "undetermined" }
+    },
+    {
+      "amount": 1,
+      "modifier": "oz",
+      "gramWeight": 28.35,
+      "measureUnit": { "name": "undetermined" }
+    },
+    {
+      "amount": 1,
+      "modifier": "slice (1 oz)",
+      "gramWeight": 28,
+      "measureUnit": { "name": "undetermined" }
+    }
+  ]
+}

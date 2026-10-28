@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { parseIngredient, parseIngredients } from "./parse";
+import { normalizeUnit, parseIngredient, parseIngredients } from "./parse";
 
 function parsed(line: string) {
   const result = parseIngredient(line);
@@ -146,5 +146,25 @@ describe("unparsed lines", () => {
       raw: line,
       reason,
     });
+  });
+});
+
+describe("normalizeUnit", () => {
+  it.each([
+    ["cups", "cup"],
+    ["Tbsp.", "tbsp"],
+    ["tablespoon", "tbsp"],
+    ["T", "tbsp"],
+    ["t", "tsp"],
+    ["fl oz", "fl_oz"],
+    ["slices", "slice"],
+  ])("%s → %s", (word, unit) => {
+    expect(normalizeUnit(word)).toBe(unit);
+  });
+
+  it("returns null for words that aren't units", () => {
+    expect(normalizeUnit("large")).toBeNull();
+    expect(normalizeUnit("")).toBeNull();
+    expect(normalizeUnit("toString")).toBeNull();
   });
 });

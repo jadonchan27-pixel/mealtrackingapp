@@ -69,13 +69,13 @@ Status: ☐ not started · ◐ in progress · ☑ done and validated
 
 ## Phase 3: Recipes and nutrition
 
-### ◐ Step 8. Ingredient parser (TR-7)
+### ☑ Step 8. Ingredient parser (TR-7)
 1. `lib/ingredients/parse.ts`: turns lines like "1 1/2 cups cooked rice, divided" into quantity, unit and food text. Handles fractions, ranges, unicode fractions and common units.
 2. Tests with at least 40 real ingredient lines; unparseable lines return a clear "unparsed" result.
 
 **Done when:** tests pass.
 
-### ☐ Step 9. Nutrition (TR-8)
+### ◐ Step 9. Nutrition (TR-8)
 1. 🧑 Get a free USDA FoodData Central API key.
 2. `lib/services/usda.ts`: search a food and fetch per-100 g nutrition and portion weights.
 3. `foods` cache: look up by name first, call USDA only on a miss.
