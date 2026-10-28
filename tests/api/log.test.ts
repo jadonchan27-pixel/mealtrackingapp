@@ -7,6 +7,7 @@ vi.mock("@/lib/auth/api", () => ({ requireUser }));
 
 const log = await import("@/app/api/log/route");
 const entry = await import("@/app/api/log/[id]/route");
+const restaurant = await import("@/app/api/log/restaurant/route");
 
 function signedIn(seed: Parameters<typeof fakeRecipeTables>[0] = {}) {
   const db = fakeRecipeTables(seed);
@@ -106,5 +107,68 @@ describe("PATCH /api/log/:id", () => {
     expect((await patch("1", { portion: 0 })).status).toBe(400);
     expect((await patch("2", { status: "confirmed" })).status).toBe(404);
     expect((await patch("abc", { status: "confirmed" })).status).toBe(404);
+  });
+});
+
+describe("POST /api/log/restaurant and DELETE /api/log/:id", () => {
+  it("adds an eat-out as eaten, then removes it", async () => {
+    const db = signedIn();
+    const res = await restaurant.POST(
+      new Request("http://localhost/api/log/restaurant", {
+        method: "POST",
+        body: JSON.stringify({
+          date: "2026-11-03",
+          slot: "lunch",
+          itemName: "Chicken enchiladas",
+          kcal: 900,
+          proteinG: 50,
+          carbsG: 70,
+          fatG: 40,
+        }),
+      }),
+    );
+    expect(res.status).toBe(200);
+    const { day } = await res.json();
+    expect(day.totals.kcal).toBe(900);
+    const id = day.entries[0].id;
+
+    const bad = await restaurant.POST(
+      new Request("http://localhost/api/log/restaurant", {
+        method: "POST",
+        body: JSON.stringify({ date: "2026-11-03", slot: "lunch" }),
+      }),
+    );
+    expect(bad.status).toBe(400);
+
+    const del = await entry.DELETE(
+      new Request(`http://localhost/api/log/${id}`, { method: "DELETE" }),
+      params({ id: String(id) }),
+    );
+    expect(del.status).toBe(200);
+    expect(db.table("log_entries")).toHaveLength(0);
+    const missing = await entry.DELETE(
+      new Request(`http://localhost/api/log/${id}`, { method: "DELETE" }),
+      params({ id: String(id) }),
+    );
+    expect(missing.status).toBe(404);
+  });
+
+  it("refuses to bring back a meal an eat-out replaced", async () => {
+    signedIn({
+      seed: {
+        log_entries: [
+          { ...ENTRY, id: 1, kind: "planned", status: "skipped" },
+          { ...ENTRY, id: 2, status: "confirmed" },
+        ],
+      },
+    });
+    const res = await entry.PATCH(
+      new Request("http://localhost/api/log/1", {
+        method: "PATCH",
+        body: JSON.stringify({ status: "confirmed" }),
+      }),
+      params({ id: "1" }),
+    );
+    expect(res.status).toBe(409);
   });
 });
