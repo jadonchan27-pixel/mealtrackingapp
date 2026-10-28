@@ -70,6 +70,17 @@ const PAGES: RecipePage[] = [
   page("https://d.test/bhurji", "Egg bhurji", ["300 g eggs"]),
 ];
 
+// Enough recipes for four slots of 3 with none shared.
+const MANY_PAGES: RecipePage[] = [
+  ...PAGES,
+  ...Array.from({ length: 8 }, (_, i) =>
+    page(`https://e.test/curry-${i}`, `Chicken curry ${i}`, [
+      `${300 + i * 20} g chicken breast`,
+      "150 g rice",
+    ]),
+  ),
+];
+
 function fakes(pages = PAGES) {
   return {
     brave: { search: vi.fn(async () => pages.map((p) => p.url)) },
@@ -153,7 +164,7 @@ describe("startWeek", () => {
 describe("searchSlot and selectCandidate", () => {
   it("builds a full shortlist and picks one recipe per slot", async () => {
     const db = fakeRecipeTables();
-    const { brave, readPage, lookup, wait } = fakes();
+    const { brave, readPage, lookup, wait } = fakes(MANY_PAGES);
     const week = await startWeek(db.client, {
       weekStart: "2026-11-01",
       cuisines: ["Indian"],
@@ -169,7 +180,7 @@ describe("searchSlot and selectCandidate", () => {
         readPage,
         wait,
       });
-      expect(result.candidates.length).toBeGreaterThan(0);
+      expect(result.candidates).toHaveLength(3);
       expect(result.candidates[0]).toMatchObject({ rank: 1, selected: true });
       expect(result.candidates.slice(1).every((c) => !c.selected)).toBe(true);
     }
@@ -180,12 +191,11 @@ describe("searchSlot and selectCandidate", () => {
     );
     expect(picked).toEqual([1, 1, 1, 1]);
 
-    // A slot never shows a recipe already picked for an earlier slot.
-    const pickedIds = MEAL_SLOTS.map(
-      (slot) => shortlist.candidates[slot].find((c) => c.selected)!.recipe.id,
+    // No recipe is shortlisted for two meals.
+    const shortlisted = MEAL_SLOTS.flatMap((slot) =>
+      shortlist.candidates[slot].map((c) => c.recipe.id),
     );
-    expect(new Set(pickedIds).size).toBe(4);
-    expect(shortlist.candidates.breakfast).toHaveLength(3);
+    expect(new Set(shortlisted).size).toBe(12);
 
     // Each candidate carries what the card shows.
     expect(shortlist.candidates.breakfast[0].recipe).toMatchObject({
@@ -286,6 +296,51 @@ describe("searchSlot and selectCandidate", () => {
         wait,
       }),
     ).rejects.toMatchObject({ status: 404 });
+  });
+});
+
+describe("selectCandidate", () => {
+  it("won't pick a recipe already picked for another meal", async () => {
+    const db = fakeRecipeTables({
+      seed: {
+        week_plans: [{ id: 1, week_start: "2026-11-01", status: "draft" }],
+        plan_candidates: [
+          {
+            id: 1,
+            week_plan_id: 1,
+            slot: "snack",
+            recipe_id: 5,
+            rank: 1,
+            selected: true,
+          },
+          {
+            id: 2,
+            week_plan_id: 1,
+            slot: "breakfast",
+            recipe_id: 6,
+            rank: 1,
+            selected: true,
+          },
+          {
+            id: 3,
+            week_plan_id: 1,
+            slot: "breakfast",
+            recipe_id: 5,
+            rank: 2,
+            selected: false,
+          },
+        ],
+      },
+    });
+    await expect(selectCandidate(db.client, 3)).rejects.toMatchObject({
+      status: 409,
+      message: "This recipe is already picked for snack",
+    });
+    expect(db.table("plan_candidates").map((c) => [c.id, c.selected])).toEqual([
+      [1, true],
+      [2, true],
+      [3, false],
+    ]);
   });
 });
 

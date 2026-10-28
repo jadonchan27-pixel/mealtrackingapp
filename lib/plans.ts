@@ -244,7 +244,8 @@ export type SlotSearch = {
 
 // US-8: searches the web for one slot and replaces its candidates with the
 // top 3, the best one selected. Recipes from last week are left out (TR-13),
-// and so are recipes already picked for this week's other slots.
+// and so are recipes already shortlisted for this week's other slots, so the
+// same recipe can't end up in two meals.
 export async function searchSlot({
   supabase,
   weekId,
@@ -269,11 +270,11 @@ export async function searchSlot({
   const others = rows(
     await supabase
       .from("plan_candidates")
-      .select("slot, recipe_id, selected")
+      .select("slot, recipe_id")
       .eq("week_plan_id", week.id),
   );
   for (const c of others) {
-    if (c.slot !== slot && c.selected) excludedIds.add(c.recipe_id);
+    if (c.slot !== slot) excludedIds.add(c.recipe_id);
   }
 
   const found = await findTopRecipes({
@@ -321,7 +322,9 @@ export async function searchSlot({
   };
 }
 
-// US-10: picks a candidate, unselecting the others in its slot.
+// US-10: picks a candidate, unselecting the others in its slot. A recipe
+// already picked for another meal can't be picked again (shortlists made
+// before searches left out other slots' candidates may share one).
 export async function selectCandidate(
   supabase: Supabase,
   candidateId: number,
@@ -335,6 +338,20 @@ export async function selectCandidate(
   );
   if (!candidate) throw new PlanError("Candidate not found", 404);
   assertDraft(await weekById(supabase, candidate.week_plan_id));
+  const pickedElsewhere = rows(
+    await supabase
+      .from("plan_candidates")
+      .select("slot")
+      .eq("week_plan_id", candidate.week_plan_id)
+      .eq("recipe_id", candidate.recipe_id)
+      .eq("selected", true),
+  ).find((c) => c.slot !== candidate.slot);
+  if (pickedElsewhere) {
+    throw new PlanError(
+      `This recipe is already picked for ${pickedElsewhere.slot}`,
+      409,
+    );
+  }
 
   check(
     await supabase
