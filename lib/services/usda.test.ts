@@ -131,6 +131,57 @@ describe("createUsdaClient", () => {
     );
   });
 
+  it("adds whole-item sizes when the match only has volume portions", async () => {
+    const onion = {
+      fdcId: 790646,
+      description: "Onions, yellow, raw",
+      foodNutrients: [{ nutrient: { id: 1008 }, amount: 38 }],
+      foodPortions: [
+        { amount: 1, gramWeight: 87, measureUnit: { name: "cup" } },
+      ],
+    };
+    const legacyOnion = {
+      fdcId: 170000,
+      description: "Onions, raw",
+      foodPortions: [
+        { amount: 1, modifier: "cup, chopped", gramWeight: 160 },
+        { amount: 1, modifier: 'medium (2-1/2" dia)', gramWeight: 110 },
+      ],
+    };
+    const fetch = vi
+      .fn()
+      .mockResolvedValueOnce(
+        jsonResponse({
+          foods: [{ fdcId: 790646, description: "Onions, yellow, raw" }],
+        }),
+      )
+      .mockResolvedValueOnce(jsonResponse(onion))
+      .mockResolvedValueOnce(
+        jsonResponse({
+          foods: [{ fdcId: 170000, description: "Onions, raw" }],
+        }),
+      )
+      .mockResolvedValueOnce(jsonResponse(legacyOnion));
+    const usda = createUsdaClient({ apiKey: "k", fetch });
+
+    const food = await usda.findFood("yellow onion");
+
+    expect(food?.gramsPerUnit).toEqual({ cup: 87, medium: 110 });
+  });
+
+  it("doesn't search again when the match has whole-item sizes", async () => {
+    const fetch = vi
+      .fn()
+      .mockResolvedValueOnce(
+        jsonResponse({
+          foods: [{ fdcId: 171287, description: "Egg, whole, raw, fresh" }],
+        }),
+      )
+      .mockResolvedValueOnce(jsonResponse(egg));
+    await createUsdaClient({ apiKey: "k", fetch }).findFood("eggs");
+    expect(fetch).toHaveBeenCalledTimes(2);
+  });
+
   it("returns null when nothing matches", async () => {
     const fetch = vi.fn().mockResolvedValue(jsonResponse({ foods: [] }));
     const usda = createUsdaClient({ apiKey: "k", fetch });

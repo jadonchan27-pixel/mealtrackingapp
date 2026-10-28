@@ -90,18 +90,24 @@ export function createUsdaClient(options: UsdaClientOptions = {}) {
     return toUsdaFood((await get(`/food/${fdcId}`)) as FoodDetails);
   }
 
-  // Foundation foods often list no household portions, so "2 large eggs"
-  // couldn't be weighed. Then the portions come from the best SR Legacy match.
+  // Foundation foods often list no whole-item portions, so "2 large eggs" or
+  // "1 onion" couldn't be weighed. Then the missing portions come from the
+  // best SR Legacy match; the food's own portions win where both have one.
   async function findFood(query: string): Promise<UsdaFood | null> {
     const fdcId = await search(query);
     if (fdcId === null) return null;
     const food = await getFood(fdcId);
-    if (Object.keys(food.gramsPerUnit).length > 0) return food;
+    if (WHOLE_ITEM_SIZES.some((k) => food.gramsPerUnit[k] !== undefined)) {
+      return food;
+    }
 
     const legacyId = await search(query, ["SR Legacy"]);
     if (legacyId === null || legacyId === fdcId) return food;
     const legacy = await getFood(legacyId);
-    return { ...food, gramsPerUnit: legacy.gramsPerUnit };
+    return {
+      ...food,
+      gramsPerUnit: { ...legacy.gramsPerUnit, ...food.gramsPerUnit },
+    };
   }
 
   return { search, getFood, findFood };
@@ -147,6 +153,16 @@ export function toUsdaFood(details: FoodDetails): UsdaFood {
     gramsPerUnit: portionWeights(details.foodPortions ?? []),
   };
 }
+
+// Portion keys that weigh a whole item.
+const WHOLE_ITEM_SIZES = [
+  "each",
+  "small",
+  "medium",
+  "large",
+  "extra large",
+  "jumbo",
+];
 
 // Size words USDA uses for whole items ("1 large egg").
 const SIZE_WORDS = new Set([
