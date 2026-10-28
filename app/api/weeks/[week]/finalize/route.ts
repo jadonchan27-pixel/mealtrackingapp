@@ -1,11 +1,14 @@
 import { NextResponse } from "next/server";
 import { requireUser } from "@/lib/auth/api";
 import { finalizeWeek, PlanError } from "@/lib/plans";
+import { writeShoppingList } from "@/lib/shopping";
 import { targetsForProfile } from "@/lib/targets";
 
 // POST /api/weeks/:id/finalize → { week }
 // Scales each pick to the daily targets, writes the plan items and a planned
-// log entry for every day and slot, and marks the week final (US-11).
+// log entry for every day and slot, marks the week final (US-11), and writes
+// the week's shopping list (US-15). If the list fails, the shopping list
+// request builds it later.
 export async function POST(
   _request: Request,
   { params }: { params: Promise<{ week: string }> },
@@ -34,6 +37,11 @@ export async function POST(
       weekId,
       targetsForProfile(profile.data),
     );
+    try {
+      await writeShoppingList(supabase, week.id);
+    } catch (err) {
+      console.error("Shopping list failed; it's built on first view", err);
+    }
     return NextResponse.json({ week });
   } catch (err) {
     if (!(err instanceof PlanError)) throw err;
