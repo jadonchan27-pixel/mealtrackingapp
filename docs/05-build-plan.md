@@ -60,7 +60,7 @@ Status: ☐ not started · ◐ in progress · ☑ done and validated
 
 **Done when:** saving the profile shows updated targets on phone and desktop.
 
-### ◐ Step 7. Weight (US-26, US-27, TR-19)
+### ☑ Step 7. Weight (US-26, US-27, TR-19)
 1. `lib/trend.ts`: 3-entry moving average, with tests.
 2. `GET/POST /api/weights`; posting also updates `profile.weight_lb`.
 3. Weight page: log a weigh-in, Recharts chart of weigh-ins with the trend line.
@@ -69,7 +69,7 @@ Status: ☐ not started · ◐ in progress · ☑ done and validated
 
 ## Phase 3: Recipes and nutrition
 
-### ☐ Step 8. Ingredient parser (TR-7)
+### ◐ Step 8. Ingredient parser (TR-7)
 1. `lib/ingredients/parse.ts`: turns lines like "1 1/2 cups cooked rice, divided" into quantity, unit and food text. Handles fractions, ranges, unicode fractions and common units.
 2. Tests with at least 40 real ingredient lines; unparseable lines return a clear "unparsed" result.
 
