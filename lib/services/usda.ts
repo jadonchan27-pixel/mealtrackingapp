@@ -1,0 +1,181 @@
+// USDA FoodData Central client (TR-8): search a food, then read its nutrition per
+// 100 g and its portion weights. https://fdc.nal.usda.gov/api-guide
+// Foundation and SR Legacy foods are used because they report nutrients per 100 g.
+
+import { normalizeUnit } from "@/lib/ingredients/parse";
+
+const BASE_URL = "https://api.nal.usda.gov/fdc/v1";
+const DATA_TYPES = ["Foundation", "SR Legacy"];
+
+export type Per100g = {
+  kcal: number | null;
+  proteinG: number | null;
+  carbsG: number | null;
+  fatG: number | null;
+  fiberG: number | null;
+  sugarG: number | null;
+  sodiumMg: number | null;
+};
+
+export type UsdaFood = {
+  fdcId: number;
+  description: string;
+  per100g: Per100g;
+  // Grams in one unit, keyed by canonical unit ("cup", "tbsp", "slice") or by a
+  // size word for whole items ("large", "medium", "each").
+  gramsPerUnit: Record<string, number>;
+};
+
+// FoodData Central nutrient ids. Energy has an Atwater variant in Foundation foods.
+const NUTRIENTS: Record<keyof Per100g, number[]> = {
+  kcal: [1008, 2047, 2048],
+  proteinG: [1003],
+  carbsG: [1005],
+  fatG: [1004],
+  fiberG: [1079],
+  sugarG: [2000, 1063],
+  sodiumMg: [1093],
+};
+
+export type UsdaClientOptions = {
+  apiKey?: string;
+  fetch?: typeof fetch;
+};
+
+export class UsdaError extends Error {}
+
+export function usdaApiKey(): string {
+  const key = process.env.USDA_API_KEY;
+  if (!key) {
+    throw new UsdaError(
+      "Missing environment variable USDA_API_KEY. See .env.example.",
+    );
+  }
+  return key;
+}
+
+export function createUsdaClient(options: UsdaClientOptions = {}) {
+  const doFetch = options.fetch ?? fetch;
+  const apiKey = () => options.apiKey ?? usdaApiKey();
+
+  async function get(path: string, params: Record<string, string> = {}) {
+    const url = new URL(`${BASE_URL}${path}`);
+    for (const [k, v] of Object.entries(params)) url.searchParams.set(k, v);
+    url.searchParams.set("api_key", apiKey());
+    const res = await doFetch(url);
+    if (!res.ok) {
+      throw new UsdaError(
+        `USDA request failed: ${res.status} ${res.statusText}`,
+      );
+    }
+    return (await res.json()) as unknown;
+  }
+
+  // The best matching food's id, or null when USDA has nothing for the name.
+  async function search(query: string): Promise<number | null> {
+    const json = (await get("/foods/search", {
+      query,
+      dataType: DATA_TYPES.join(","),
+      pageSize: "5",
+    })) as { foods?: { fdcId: number }[] };
+    return json.foods?.[0]?.fdcId ?? null;
+  }
+
+  async function getFood(fdcId: number): Promise<UsdaFood> {
+    return toUsdaFood((await get(`/food/${fdcId}`)) as FoodDetails);
+  }
+
+  async function findFood(query: string): Promise<UsdaFood | null> {
+    const fdcId = await search(query);
+    return fdcId === null ? null : getFood(fdcId);
+  }
+
+  return { search, getFood, findFood };
+}
+
+export type UsdaClient = ReturnType<typeof createUsdaClient>;
+
+// The parts of a /food/{id} response that are used.
+export type FoodDetails = {
+  fdcId: number;
+  description: string;
+  foodNutrients?: {
+    nutrient?: { id?: number };
+    amount?: number;
+  }[];
+  foodPortions?: {
+    gramWeight?: number;
+    amount?: number;
+    modifier?: string;
+    portionDescription?: string;
+    measureUnit?: { name?: string; abbreviation?: string };
+  }[];
+};
+
+export function toUsdaFood(details: FoodDetails): UsdaFood {
+  const amounts = new Map<number, number>();
+  for (const n of details.foodNutrients ?? []) {
+    if (n.nutrient?.id !== undefined && typeof n.amount === "number") {
+      amounts.set(n.nutrient.id, n.amount);
+    }
+  }
+  const per100g = Object.fromEntries(
+    Object.entries(NUTRIENTS).map(([key, ids]) => {
+      const id = ids.find((i) => amounts.has(i));
+      return [key, id === undefined ? null : amounts.get(id)!];
+    }),
+  ) as Per100g;
+
+  return {
+    fdcId: details.fdcId,
+    description: details.description,
+    per100g,
+    gramsPerUnit: portionWeights(details.foodPortions ?? []),
+  };
+}
+
+// Size words USDA uses for whole items ("1 large egg").
+const SIZE_WORDS = new Set([
+  "small",
+  "medium",
+  "large",
+  "extra large",
+  "jumbo",
+  "each",
+  "whole",
+]);
+
+function portionWeights(
+  portions: NonNullable<FoodDetails["foodPortions"]>,
+): Record<string, number> {
+  const weights: Record<string, number> = {};
+  for (const p of portions) {
+    if (!p.gramWeight || p.gramWeight <= 0) continue;
+    const amount = p.amount && p.amount > 0 ? p.amount : 1;
+    const key = portionKey(p);
+    // Keep the first weight for each key: USDA lists the plain portion first.
+    if (key && weights[key] === undefined) {
+      weights[key] = Math.round((p.gramWeight / amount) * 100) / 100;
+    }
+  }
+  return weights;
+}
+
+// Foundation foods name the unit in measureUnit; SR Legacy leaves it
+// "undetermined" and puts it in the modifier ("cup, chopped", "large").
+function portionKey(
+  p: NonNullable<FoodDetails["foodPortions"]>[number],
+): string | null {
+  const unitName = p.measureUnit?.name?.toLowerCase();
+  const text =
+    unitName && unitName !== "undetermined"
+      ? unitName
+      : (p.modifier ?? p.portionDescription ?? "");
+  const head = text.toLowerCase().split(/[,(]/)[0].trim();
+  if (head === "") return null;
+  for (const size of SIZE_WORDS) {
+    if (head === size || head.startsWith(`${size} `))
+      return size === "whole" ? "each" : size;
+  }
+  return normalizeUnit(head) ?? normalizeUnit(head.split(" ")[0]);
+}

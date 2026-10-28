@@ -1,0 +1,108 @@
+{
+  "fdcId": 171287,
+  "description": "Egg, whole, raw, fresh",
+  "dataType": "SR Legacy",
+  "foodNutrients": [
+    {
+      "nutrient": {
+        "id": 1008,
+        "number": "208",
+        "name": "Energy",
+        "unitName": "kcal"
+      },
+      "amount": 143
+    },
+    {
+      "nutrient": {
+        "id": 1003,
+        "number": "203",
+        "name": "Protein",
+        "unitName": "g"
+      },
+      "amount": 12.56
+    },
+    {
+      "nutrient": {
+        "id": 1004,
+        "number": "204",
+        "name": "Total lipid (fat)",
+        "unitName": "g"
+      },
+      "amount": 9.51
+    },
+    {
+      "nutrient": {
+        "id": 1005,
+        "number": "205",
+        "name": "Carbohydrate, by difference",
+        "unitName": "g"
+      },
+      "amount": 0.72
+    },
+    {
+      "nutrient": {
+        "id": 1079,
+        "number": "291",
+        "name": "Fiber, total dietary",
+        "unitName": "g"
+      },
+      "amount": 0
+    },
+    {
+      "nutrient": {
+        "id": 2000,
+        "number": "269",
+        "name": "Sugars, total including NLEA",
+        "unitName": "g"
+      },
+      "amount": 0.37
+    },
+    {
+      "nutrient": {
+        "id": 1093,
+        "number": "307",
+        "name": "Sodium, Na",
+        "unitName": "mg"
+      },
+      "amount": 142
+    }
+  ],
+  "foodPortions": [
+    {
+      "amount": 1,
+      "modifier": "cup (4.86 large eggs)",
+      "gramWeight": 243,
+      "measureUnit": { "name": "undetermined" }
+    },
+    {
+      "amount": 1,
+      "modifier": "extra large",
+      "gramWeight": 56,
+      "measureUnit": { "name": "undetermined" }
+    },
+    {
+      "amount": 1,
+      "modifier": "jumbo",
+      "gramWeight": 63,
+      "measureUnit": { "name": "undetermined" }
+    },
+    {
+      "amount": 1,
+      "modifier": "large",
+      "gramWeight": 50,
+      "measureUnit": { "name": "undetermined" }
+    },
+    {
+      "amount": 1,
+      "modifier": "medium",
+      "gramWeight": 44,
+      "measureUnit": { "name": "undetermined" }
+    },
+    {
+      "amount": 1,
+      "modifier": "small",
+      "gramWeight": 38,
+      "measureUnit": { "name": "undetermined" }
+    }
+  ]
+}

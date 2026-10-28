@@ -486,6 +486,17 @@ function round(n: number): number {
   return Math.round(n * 1000) / 1000;
 }
 
+// The canonical unit for a word such as "cups" or "Tbsp", or null if it isn't a unit.
+export function normalizeUnit(word: string): string | null {
+  const compact = word.trim().replace(/\.$/, "").replace(/\s+/g, " ");
+  if (compact === "" || !Object.hasOwn(UNIT_ALIASES, compact.toLowerCase())) {
+    return compact.length === 1 && Object.hasOwn(UNIT_ALIASES, compact)
+      ? UNIT_ALIASES[compact]
+      : null;
+  }
+  return canonicalUnit(compact);
+}
+
 export function parseIngredients(lines: readonly string[]): IngredientResult[] {
   return lines.map(parseIngredient);
 }
