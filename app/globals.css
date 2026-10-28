@@ -698,3 +698,82 @@ button:disabled {
 .shopping-paid button {
   min-height: 44px;
 }
+
+.today-totals {
+  display: grid;
+  gap: 10px;
+  margin: 0;
+}
+
+.today-totals div {
+  display: grid;
+  grid-template-columns: 6em 1fr;
+  align-items: baseline;
+  gap: 8px;
+}
+
+.today-totals dt {
+  color: var(--muted);
+}
+
+.today-totals dd {
+  margin: 0;
+}
+
+.today-bar {
+  display: block;
+  height: 6px;
+  margin-top: 4px;
+  border-radius: 3px;
+  background: var(--border);
+  overflow: hidden;
+}
+
+.today-bar span {
+  display: block;
+  height: 100%;
+  background: var(--accent);
+}
+
+.today-entry {
+  display: grid;
+  grid-template-columns: 88px 1fr;
+  gap: 12px;
+}
+
+.today-photo {
+  width: 88px;
+  height: 88px;
+  object-fit: cover;
+  border-radius: 8px;
+}
+
+.today-body h3 {
+  margin: 0 0 4px;
+}
+
+.today-skipped {
+  opacity: 0.7;
+}
+
+.today-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin-top: 8px;
+}
+
+.today-actions button {
+  min-height: 44px;
+  min-width: 44px;
+}
+
+.today-status {
+  font-weight: 600;
+}
+
+.today-portion {
+  display: inline-flex;
+  gap: 4px;
+}
