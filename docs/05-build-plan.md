@@ -137,17 +137,17 @@ Status: ☐ not started · ◐ in progress · ☑ done and validated
 
 ## Phase 5: Shopping list
 
-### ◐ Step 15. H-E-B price table (TR-16)
+### ☑ Step 15. H-E-B price table (TR-16)
 1. `lib/hebCatalog.ts`: estimated H-E-B package sizes, prices and store sections for ~150 common ingredients, matched to a food by name. A `heb_products` row needs a food, so each food gets its row from the catalog the first time it's priced.
 2. When a food matches nothing in the catalog, create an estimated row from its section's default price per gram (the section guessed from the food's name).
 3. Recipe costs (step 11) and finalize (step 13) create any missing rows first.
 
 **Done when:** every food used in a plan maps to a product.
 
-### ☐ Step 16. Shopping list generation (US-15 to US-18, TR-15, TR-17)
-1. `lib/shopping.ts`: sum grams per food across recipes and batches, round up to packages, set the batch flag, with tests.
+### ◐ Step 16. Shopping list generation (US-15 to US-18, TR-15, TR-17)
+1. `lib/shopping.ts`: sum grams per food across recipes and batches, round up to packages, set the batch flag, with tests. Foods that share a product (green onions and scallions) are one line. Staples with no amount ("salt to taste") are one package; water is left out.
 2. Finalize (step 13) also writes `shopping_list_items`.
-3. `GET /api/weeks/:id/shopping-list`: grouped by section, with total.
+3. `GET /api/weeks/:id/shopping-list`: grouped by section, with total. A week finalized before this step gets its list built on its first request.
 
 **Done when:** the list for a finalized plan shows packages, prices, batch marks and a total.
 

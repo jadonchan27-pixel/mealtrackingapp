@@ -13,6 +13,7 @@ const recipe = await import("@/app/api/recipes/[id]/route");
 const finalize = await import("@/app/api/weeks/[week]/finalize/route");
 const batches = await import("@/app/api/weeks/[week]/batches/route");
 const reset = await import("@/app/api/weeks/[week]/reset/route");
+const shopping = await import("@/app/api/weeks/[week]/shopping-list/route");
 
 function signedIn(seed: Parameters<typeof fakeRecipeTables>[0] = {}) {
   const db = fakeRecipeTables(seed);
@@ -277,5 +278,58 @@ describe("POST /api/weeks/:id/reset", () => {
       const missing = await reset.POST(request("POST"), params({ week: id }));
       expect(missing.status).toBe(404);
     }
+  });
+});
+
+describe("GET /api/weeks/:id/shopping-list", () => {
+  it("returns a finalized week's list, grouped, with the total", async () => {
+    signedIn({
+      seed: {
+        week_plans: [
+          { id: 1, week_start: "2026-11-01", status: "final" },
+          { id: 2, week_start: "2026-11-08", status: "draft" },
+        ],
+        shopping_list_items: [
+          {
+            id: 1,
+            week_plan_id: 1,
+            name: "Limes, each",
+            section: "produce",
+            needed_grams: 120,
+            packages: 2,
+            price_cents: 50,
+            batch: "both",
+            checked: false,
+          },
+        ],
+      },
+    });
+    const res = await shopping.GET(request("GET"), params({ week: "1" }));
+    expect(res.status).toBe(200);
+    expect(await res.json()).toEqual({
+      sections: [
+        {
+          section: "produce",
+          label: "Produce",
+          items: [
+            {
+              id: 1,
+              name: "Limes, each",
+              neededGrams: 120,
+              packages: 2,
+              priceCents: 50,
+              batch: "both",
+              checked: false,
+            },
+          ],
+        },
+      ],
+      totalCents: 50,
+    });
+
+    const draft = await shopping.GET(request("GET"), params({ week: "2" }));
+    expect(draft.status).toBe(409);
+    const missing = await shopping.GET(request("GET"), params({ week: "9" }));
+    expect(missing.status).toBe(404);
   });
 });

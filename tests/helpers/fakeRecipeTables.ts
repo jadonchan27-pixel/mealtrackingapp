@@ -22,6 +22,7 @@ const DEFAULTS: Partial<Record<(typeof TABLES)[number], Row>> = {
   week_plans: { cuisines: [], status: "draft" },
   plan_candidates: { selected: false },
   heb_products: { is_estimate: true },
+  shopping_list_items: { checked: false },
   foods: { section: "pantry" },
   log_entries: { status: "planned", portion: 1 },
 };
