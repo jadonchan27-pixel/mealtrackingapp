@@ -41,26 +41,26 @@ export function isEligible(
   );
 }
 
-function normalizeCuisine(s: string): string {
+function cuisineWords(s: string): string[] {
   return s
     .toLowerCase()
-    .replace(/[^a-z]+/g, " ")
-    .trim();
+    .split(/[^a-z]+/)
+    .filter((w) => w !== "");
 }
 
 // 1 when the recipe's cuisine is one of the chosen ones, 0 when it's another,
-// and 0.5 when the page doesn't say. With no cuisine chosen, everything fits.
+// and 0.5 when the page doesn't say. A chosen cuisine matches when all its
+// words are in the recipe's ("Indian" matches "South Indian", but "Asian"
+// doesn't match "Caucasian"). With no cuisine chosen, everything fits.
 export function cuisineScore(
   recipeCuisine: string | null,
   cuisines: readonly string[],
 ): number {
-  const wanted = cuisines.map(normalizeCuisine).filter((c) => c !== "");
+  const wanted = cuisines.map(cuisineWords).filter((w) => w.length > 0);
   if (wanted.length === 0) return 1;
-  if (recipeCuisine === null || normalizeCuisine(recipeCuisine) === "") {
-    return 0.5;
-  }
-  const have = normalizeCuisine(recipeCuisine);
-  return wanted.some((c) => have.includes(c) || c.includes(have)) ? 1 : 0;
+  const have = cuisineWords(recipeCuisine ?? "");
+  if (have.length === 0) return 0.5;
+  return wanted.some((words) => words.every((w) => have.includes(w))) ? 1 : 0;
 }
 
 export function proteinPer100Kcal(recipe: RankableRecipe): number {

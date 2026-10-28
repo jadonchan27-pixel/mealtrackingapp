@@ -6,9 +6,11 @@ import { describe, expect, it, vi } from "vitest";
 import type { FoodRow } from "@/lib/db/types";
 import {
   findTopRecipes,
+  MAX_PAGES,
   mightBeRecipePage,
   previousWeekRecipeIds,
   previousWeekStart,
+  searchQueries,
   searchQuery,
 } from "@/lib/recipeSearch";
 import { RecipePageError, type RecipePage } from "@/lib/services/recipePage";
@@ -113,6 +115,8 @@ const PAGES: Record<string, RecipePage | null | Error> = {
   ),
 };
 
+const noWait = vi.fn(async () => {});
+
 function fakes() {
   const brave = {
     search: vi.fn(async () => Object.keys(PAGES)),
@@ -138,12 +142,13 @@ describe("findTopRecipes", () => {
       readPage,
       slot: "dinner",
       cuisines: ["Indian"],
+      wait: noWait,
     });
 
-    expect(brave.search).toHaveBeenCalledWith(
-      "Indian high protein dinner recipe",
-      20,
-    );
+    expect(brave.search.mock.calls).toEqual([
+      ["Indian chicken dinner recipe", 20],
+      ["Indian beef dinner recipe", 20],
+    ]);
     // Per serving (protein per 100 kcal, cost):
     //   Tandoori 430 kcal, 13.7 g, $2.70   Dal    362 kcal, 5.7 g, $0.80
     //   Paneer   610 kcal,  5.4 g, $2.45   Pasta  360 kcal, 18.8 g, $3.00
@@ -184,6 +189,7 @@ describe("findTopRecipes", () => {
         slot: "dinner",
         cuisines: ["Indian"],
         excludedIds,
+        wait: noWait,
       });
     const before = await run();
     const tandoori = before.top.find((r) =>
@@ -202,24 +208,82 @@ describe("findTopRecipes", () => {
     expect(first.readPage.mock.calls.length - pagesRead).toBe(2);
   });
 
-  it("splits the results between several cuisines", async () => {
+  it("searches each cuisine, pausing between searches, and takes their results in turn", async () => {
     const db = fakeRecipeTables();
-    const { brave, readPage, lookup } = fakes();
-    brave.search.mockResolvedValue([]);
+    const { readPage, lookup } = fakes();
+    const brave = {
+      search: vi.fn(async (q: string) =>
+        Array.from(
+          { length: 20 },
+          (_, i) => `https://${q.split(" ")[0]}.test/${i}`,
+        ),
+      ),
+    };
+    readPage.mockResolvedValue(null);
+    const wait = vi.fn(async () => {});
 
-    await findTopRecipes({
+    const result = await findTopRecipes({
       supabase: db.client,
       brave,
       lookup,
       readPage,
       slot: "snack",
       cuisines: ["Indian", "Thai"],
+      wait,
     });
 
-    expect(brave.search.mock.calls).toEqual([
-      ["Indian high protein snack recipe", 10],
-      ["Thai high protein snack recipe", 10],
+    expect(brave.search.mock.calls.map((c) => c[0])).toEqual([
+      "Indian greek yogurt snack recipe",
+      "Indian egg snack recipe",
+      "Thai greek yogurt snack recipe",
+      "Thai egg snack recipe",
     ]);
+    expect(wait).toHaveBeenCalledTimes(3);
+    expect(wait).toHaveBeenCalledWith(1100);
+    // Indian's and Thai's links alternate, up to the page limit.
+    const read = readPage.mock.calls.map((c) => c[0]);
+    expect(read).toHaveLength(MAX_PAGES);
+    expect(read.slice(0, 4)).toEqual([
+      "https://Indian.test/0",
+      "https://Thai.test/0",
+      "https://Indian.test/1",
+      "https://Thai.test/1",
+    ]);
+    expect(result.top).toEqual([]);
+  });
+
+  it("keeps going when one search fails, and fails when all do", async () => {
+    const db = fakeRecipeTables({ seed: { heb_products: PRODUCTS } });
+    const { readPage, lookup } = fakes();
+    const limited = new Error("Brave search failed: 429 Too Many Requests");
+    const brave = {
+      search: vi
+        .fn()
+        .mockRejectedValueOnce(limited)
+        .mockResolvedValueOnce(["https://c.test/dal"]),
+    };
+    const run = () =>
+      findTopRecipes({
+        supabase: db.client,
+        brave,
+        lookup,
+        readPage,
+        slot: "dinner",
+        cuisines: ["Indian"],
+        wait: noWait,
+      });
+
+    const result = await run();
+    expect(result.top.map((r) => r.recipe.title)).toEqual(["Dal"]);
+    expect(result.skipped).toEqual([
+      {
+        url: "search: Indian chicken dinner recipe",
+        reason: "Brave search failed: 429 Too Many Requests",
+      },
+    ]);
+
+    brave.search.mockRejectedValue(limited);
+    await expect(run()).rejects.toThrow(limited);
   });
 });
 
@@ -246,11 +310,22 @@ describe("mightBeRecipePage", () => {
 });
 
 describe("searchQuery", () => {
-  it("builds the search from the cuisine and slot", () => {
-    expect(searchQuery("breakfast", "Mexican")).toBe(
-      "Mexican high protein breakfast recipe",
+  it("builds the search from the cuisine, protein and slot", () => {
+    expect(searchQuery("breakfast", "Mexican", "egg")).toBe(
+      "Mexican egg breakfast recipe",
     );
-    expect(searchQuery("lunch")).toBe("high protein lunch recipe");
+    expect(searchQuery("lunch")).toBe("lunch recipe");
+  });
+
+  it("searches each slot protein, with or without a cuisine", () => {
+    expect(searchQueries("lunch")).toEqual([
+      "chicken lunch recipe",
+      "lentil lunch recipe",
+    ]);
+    expect(searchQueries("dinner", ["Thai"])).toEqual([
+      "Thai chicken dinner recipe",
+      "Thai beef dinner recipe",
+    ]);
   });
 });
 

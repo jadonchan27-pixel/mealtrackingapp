@@ -49,6 +49,11 @@ describe("cuisineScore", () => {
     expect(cuisineScore("South Indian", ["Indian"])).toBe(1);
   });
 
+  it("matches whole words only", () => {
+    expect(cuisineScore("Caucasian", ["Asian"])).toBe(0);
+    expect(cuisineScore("Indian", ["South Indian"])).toBe(0);
+  });
+
   it("scores other cuisines 0 and unknown ones in between", () => {
     expect(cuisineScore("Italian", ["Indian"])).toBe(0);
     expect(cuisineScore(null, ["Indian"])).toBe(0.5);

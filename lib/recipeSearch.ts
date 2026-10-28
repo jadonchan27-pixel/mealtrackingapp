@@ -11,12 +11,42 @@ import { saveRecipeFromUrl } from "@/lib/recipes";
 import { MAX_RESULTS, type BraveClient } from "@/lib/services/braveSearch";
 import type { RecipePage } from "@/lib/services/recipePage";
 
-// e.g. "indian high protein dinner recipe"
-export function searchQuery(slot: MealSlot, cuisine?: string): string {
-  return [cuisine?.trim(), "high protein", slot, "recipe"]
-    .filter(Boolean)
-    .join(" ");
+// Protein foods to search for in each slot. "high protein" in the query
+// mostly finds roundup articles (1 usable recipe in 20 in the live check),
+// while naming a protein finds single recipes (8 in 20); ranking still
+// favors protein per calorie.
+export const SLOT_PROTEINS: Record<MealSlot, readonly string[]> = {
+  breakfast: ["egg", "greek yogurt"],
+  lunch: ["chicken", "lentil"],
+  dinner: ["chicken", "beef"],
+  snack: ["greek yogurt", "egg"],
+};
+
+// e.g. "Indian chicken dinner recipe"
+export function searchQuery(
+  slot: MealSlot,
+  cuisine?: string,
+  protein?: string,
+): string {
+  return [cuisine?.trim(), protein, slot, "recipe"].filter(Boolean).join(" ");
 }
+
+// One search per cuisine (or one with none) and protein.
+export function searchQueries(
+  slot: MealSlot,
+  cuisines: readonly string[] = [],
+): string[] {
+  const chosen = cuisines.length > 0 ? cuisines : [undefined];
+  return chosen.flatMap((c) =>
+    SLOT_PROTEINS[slot].map((p) => searchQuery(slot, c, p)),
+  );
+}
+
+// Pages read per slot: a slot runs in one request (architecture), so this
+// bounds how long it takes.
+export const MAX_PAGES = MAX_RESULTS;
+// Pages read at the same time.
+const PAGE_CONCURRENCY = 4;
 
 // Sites whose pages are videos or posts, never a recipe page to read.
 const NON_RECIPE_HOSTS = [
@@ -80,6 +110,40 @@ export async function previousWeekRecipeIds(
 
 export type SkippedPage = { url: string; reason: string };
 
+export const SEARCH_PAUSE_MS = 1100;
+
+function sleep(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+// Runs `fn` over the items, at most `limit` at a time, keeping their order.
+async function mapWithConcurrency<T, R>(
+  items: readonly T[],
+  limit: number,
+  fn: (item: T) => Promise<R>,
+): Promise<PromiseSettledResult<R>[]> {
+  const results: PromiseSettledResult<R>[] = new Array(items.length);
+  let next = 0;
+  async function worker() {
+    while (next < items.length) {
+      const i = next++;
+      try {
+        results[i] = { status: "fulfilled", value: await fn(items[i]) };
+      } catch (reason) {
+        results[i] = { status: "rejected", reason };
+      }
+    }
+  }
+  await Promise.all(
+    Array.from({ length: Math.min(limit, items.length) }, worker),
+  );
+  return results;
+}
+
+function errorMessage(err: unknown): string {
+  return err instanceof Error ? err.message : String(err);
+}
+
 export type SlotSearchResult = {
   top: RankedRecipe<RecipeRow>[];
   // Recipes read for this search (saved now or already stored).
@@ -87,9 +151,9 @@ export type SlotSearchResult = {
   skipped: SkippedPage[];
 };
 
-// Searches once per chosen cuisine (or once with none), splitting Brave's 20
-// results between them, then reads each page in turn. A page that can't be
-// read or has no usable recipe is skipped, not fatal.
+// Searches for each chosen cuisine and slot protein, then reads up to 20 of
+// the results, a few at a time. A search that fails, or a page that can't be
+// read or has no usable recipe, is skipped, not fatal.
 export async function findTopRecipes({
   supabase,
   brave,
@@ -100,6 +164,7 @@ export async function findTopRecipes({
   limit = 3,
   readPage,
   userId,
+  wait = sleep,
 }: {
   supabase: SupabaseClient<Database>;
   brave: Pick<BraveClient, "search">;
@@ -111,43 +176,52 @@ export async function findTopRecipes({
   limit?: number;
   readPage?: (url: string) => Promise<RecipePage | null>;
   userId?: string;
+  wait?: (ms: number) => Promise<void>;
 }): Promise<SlotSearchResult> {
-  const queries =
-    cuisines.length > 0
-      ? cuisines.map((c) => searchQuery(slot, c))
-      : [searchQuery(slot)];
-  const perQuery = Math.max(1, Math.floor(MAX_RESULTS / queries.length));
-
-  const urls: string[] = [];
-  for (const q of queries) {
-    for (const url of await brave.search(q, perQuery)) {
-      if (!urls.includes(url) && mightBeRecipePage(url)) urls.push(url);
-    }
-  }
-
-  const recipes: RecipeRow[] = [];
+  const lists: string[][] = [];
   const skipped: SkippedPage[] = [];
-  for (const url of urls) {
+  let searchError: unknown = null;
+  for (const [i, q] of searchQueries(slot, cuisines).entries()) {
+    // Brave's free plan allows about one request per second.
+    if (i > 0) await wait(SEARCH_PAUSE_MS);
     try {
-      const result = await saveRecipeFromUrl({
-        supabase,
-        url,
-        lookup,
-        readPage,
-        userId,
-      });
-      if (result.status === "skipped") {
-        skipped.push({ url, reason: result.reason });
-      } else if (!recipes.some((r) => r.id === result.recipe.id)) {
-        recipes.push(result.recipe);
-      }
+      lists.push(
+        (await brave.search(q, MAX_RESULTS)).filter(mightBeRecipePage),
+      );
     } catch (err) {
-      skipped.push({
-        url,
-        reason: err instanceof Error ? err.message : String(err),
-      });
+      // One failed search shouldn't lose the other searches' results.
+      searchError = err;
+      skipped.push({ url: `search: ${q}`, reason: errorMessage(err) });
     }
   }
+  // Take the searches' results in turn, so each gets its best links in.
+  const urls: string[] = [];
+  for (let rank = 0; urls.length < MAX_PAGES; rank++) {
+    const next = lists.map((l) => l[rank]).filter((u) => u !== undefined);
+    if (next.length === 0) break;
+    for (const url of next) {
+      if (!urls.includes(url) && urls.length < MAX_PAGES) urls.push(url);
+    }
+  }
+  if (urls.length === 0 && searchError !== null) throw searchError;
+
+  const outcomes = await mapWithConcurrency(urls, PAGE_CONCURRENCY, (url) =>
+    saveRecipeFromUrl({ supabase, url, lookup, readPage, userId }),
+  );
+  const recipes: RecipeRow[] = [];
+  outcomes.forEach((outcome, i) => {
+    const url = urls[i];
+    if (outcome.status === "rejected") {
+      skipped.push({ url, reason: errorMessage(outcome.reason) });
+      return;
+    }
+    const result = outcome.value;
+    if (result.status === "skipped") {
+      skipped.push({ url, reason: result.reason });
+    } else if (!recipes.some((r) => r.id === result.recipe.id)) {
+      recipes.push(result.recipe);
+    }
+  });
 
   const costs = await updateRecipeCosts(supabase, recipes);
   const priced = recipes.map((r) => ({
