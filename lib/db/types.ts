@@ -47,6 +47,9 @@ export type ProfileRow = Timestamps & {
   weight_lb: number;
   activity_level: ActivityLevel;
   surplus_kcal: number;
+  // US-28: ingredients a dish may need, pantry staples left out; null = no limit.
+  min_ingredients: number | null;
+  max_ingredients: number | null;
 };
 
 export type FoodRow = Timestamps & {
@@ -176,7 +179,10 @@ export type Database = {
   __InternalSupabase: { PostgrestVersion: "13" };
   public: {
     Tables: {
-      profile: TableDef<ProfileRow, Defaulted | "surplus_kcal">;
+      profile: TableDef<
+        ProfileRow,
+        Defaulted | "surplus_kcal" | "min_ingredients" | "max_ingredients"
+      >;
       foods: TableDef<
         FoodRow,
         | Defaulted

@@ -6,6 +6,11 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Database, MealSlot, RecipeRow } from "@/lib/db/types";
 import { updateRecipeCosts } from "@/lib/cost";
 import type { FoodLookup } from "@/lib/foods";
+import {
+  countIngredients,
+  inIngredientRange,
+  type IngredientRange,
+} from "@/lib/ingredientCount";
 import { rankRecipes, type RankedRecipe } from "@/lib/ranking";
 import { saveRecipeFromUrl } from "@/lib/recipes";
 import { MAX_RESULTS, type BraveClient } from "@/lib/services/braveSearch";
@@ -165,6 +170,7 @@ export async function findTopRecipes({
   readPage,
   userId,
   wait = sleep,
+  ingredientRange,
 }: {
   supabase: SupabaseClient<Database>;
   brave: Pick<BraveClient, "search">;
@@ -177,6 +183,8 @@ export async function findTopRecipes({
   readPage?: (url: string) => Promise<RecipePage | null>;
   userId?: string;
   wait?: (ms: number) => Promise<void>;
+  // US-28: how many ingredients a dish may need (pantry staples left out).
+  ingredientRange?: IngredientRange;
 }): Promise<SlotSearchResult> {
   const lists: string[][] = [];
   const skipped: SkippedPage[] = [];
@@ -223,13 +231,39 @@ export async function findTopRecipes({
     }
   });
 
+  // TR-22: recipes needing more or fewer ingredients than the range are
+  // left out, like the ones from last week.
+  const excluded = new Set(excludedIds);
+  if (
+    ingredientRange &&
+    (ingredientRange.min !== null || ingredientRange.max !== null) &&
+    recipes.length > 0
+  ) {
+    const lines = await supabase
+      .from("recipe_ingredients")
+      .select("recipe_id, raw_text")
+      .in(
+        "recipe_id",
+        recipes.map((r) => r.id),
+      );
+    if (lines.error) throw new Error(lines.error.message);
+    for (const r of recipes) {
+      const count = countIngredients(
+        (lines.data ?? [])
+          .filter((l) => l.recipe_id === r.id)
+          .map((l) => l.raw_text),
+      );
+      if (!inIngredientRange(count, ingredientRange)) excluded.add(r.id);
+    }
+  }
+
   const costs = await updateRecipeCosts(supabase, recipes);
   const priced = recipes.map((r) => ({
     ...r,
     cost_cents_per_serving: costs.get(r.id) ?? null,
   }));
   return {
-    top: rankRecipes(priced, { cuisines, excludedIds, limit }),
+    top: rankRecipes(priced, { cuisines, excludedIds: excluded, limit }),
     recipes: priced,
     skipped,
   };

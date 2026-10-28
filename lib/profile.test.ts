@@ -16,11 +16,26 @@ const valid = {
   heightIn: 70,
   weightLb: 160,
   activityLevel: "moderate",
+  minIngredients: null,
+  maxIngredients: null,
 };
 
 describe("parseProfile", () => {
   it("accepts a valid profile", () => {
     expect(parseProfile(valid)).toEqual({ ok: true, profile: valid });
+  });
+
+  it("takes an optional ingredient range", () => {
+    expect(
+      parseProfile({ ...valid, minIngredients: 3, maxIngredients: 5 }),
+    ).toEqual({
+      ok: true,
+      profile: { ...valid, minIngredients: 3, maxIngredients: 5 },
+    });
+    expect(parseProfile({ ...valid, maxIngredients: 8 })).toMatchObject({
+      ok: true,
+      profile: { minIngredients: null, maxIngredients: 8 },
+    });
   });
 
   it("accepts fractional height and weight", () => {
@@ -44,6 +59,9 @@ describe("parseProfile", () => {
     ["weightLb", { weightLb: 2000 }],
     ["activityLevel", { activityLevel: "extreme" }],
     ["activityLevel", { activityLevel: "toString" }],
+    ["minIngredients", { minIngredients: 0 }],
+    ["maxIngredients", { maxIngredients: 3.5 }],
+    ["maxIngredients", { minIngredients: 6, maxIngredients: 4 }],
   ])("rejects a bad %s: %o", (field, change) => {
     const result = parseProfile({ ...valid, ...change });
     expect(result.ok).toBe(false);
@@ -73,6 +91,8 @@ describe("row mapping", () => {
     weight_lb: 160,
     activity_level: "moderate",
     surplus_kcal: 300,
+    min_ingredients: null,
+    max_ingredients: null,
     created_at: "2026-10-28T00:00:00Z",
     updated_at: "2026-10-28T00:00:00Z",
   };
@@ -86,6 +106,8 @@ describe("row mapping", () => {
       height_in: 70,
       weight_lb: 160,
       activity_level: "moderate",
+      min_ingredients: null,
+      max_ingredients: null,
     });
   });
 });

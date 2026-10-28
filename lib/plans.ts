@@ -324,7 +324,17 @@ export async function searchSlot({
     if (c.slot !== slot) excludedIds.add(c.recipe_id);
   }
 
+  const profile = check(
+    await supabase
+      .from("profile")
+      .select("min_ingredients, max_ingredients")
+      .maybeSingle(),
+  );
   const found = await findTopRecipes({
+    ingredientRange: {
+      min: profile?.min_ingredients ?? null,
+      max: profile?.max_ingredients ?? null,
+    },
     supabase,
     brave,
     lookup,

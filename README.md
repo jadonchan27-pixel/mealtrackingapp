@@ -22,4 +22,4 @@ Copy `.env.example` to `.env.local` and fill in the values. `.env.local` is neve
 
 ## Database
 
-Migrations live in `supabase/migrations/`. Apply them in order (`001_schema.sql`, then `002_rls.sql`) in the Supabase dashboard's SQL Editor. When a migration changes a table, update `lib/db/types.ts` to match.
+Migrations live in `supabase/migrations/`. Apply them in order (`001_schema.sql`, `002_rls.sql`, then `003_ingredient_range.sql`) in the Supabase dashboard's SQL Editor. When a migration changes a table, update `lib/db/types.ts` to match.
