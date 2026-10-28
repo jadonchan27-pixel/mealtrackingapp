@@ -73,6 +73,7 @@ describe("matchCatalog", () => {
     ["lime juice", "lime juice"],
     ["avocado", "avocado"],
     ["flour tortillas", "flour tortilla"],
+    ["grape tomatoes", "grape tomato"],
     ["sugar snap peas", "snap pea"],
     ["bean sprouts", "bean sprout"],
   ])("%s → %s", (food, match) => {

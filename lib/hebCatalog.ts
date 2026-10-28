@@ -257,6 +257,7 @@ const ROWS: Row[] = [
 
   // Two-word names whose words would otherwise match another product
   ["egg noodle", "Egg noodles, 12 oz", "pantry", 12 * OZ, 199],
+  ["grape tomato", "Grape tomatoes, 10 oz", "produce", 10 * OZ, 248],
   ["flour tortilla", "Flour tortillas, 10 ct", "bakery", 450, 249],
   ["bean sprout", "Bean sprouts, 12 oz", "produce", 12 * OZ, 199],
   ["snap pea", "Sugar snap peas, 8 oz", "produce", 8 * OZ, 299],
