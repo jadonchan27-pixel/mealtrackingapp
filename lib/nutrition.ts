@@ -9,6 +9,7 @@ import {
   type Measure,
   type ParsedIngredient,
 } from "@/lib/ingredients/parse";
+import { isPlainWater, typicalGrams } from "@/lib/typicalWeights";
 import { isMassUnit, isVolumeUnit, toGrams, toMl } from "@/lib/units";
 
 export type FoodNutrition = Pick<
@@ -139,12 +140,17 @@ export function ingredientGrams(
 
   // A package with a stated size: "1 (14.5 oz) can" weighs 14.5 oz.
   const size: Measure | null = ingredient.size;
+  // When the food's record has no weight for the unit, a typical one.
   if (size && size.unit !== null) {
-    const perSize = gramsInOne(size.unit, weights, ingredient.food);
+    const perSize =
+      gramsInOne(size.unit, weights, ingredient.food) ??
+      typicalGrams(size.unit, ingredient.food);
     if (perSize !== null) return amount * size.quantity * perSize;
   }
 
-  const perUnit = gramsInOne(ingredient.unit, weights, ingredient.food);
+  const perUnit =
+    gramsInOne(ingredient.unit, weights, ingredient.food) ??
+    typicalGrams(ingredient.unit, ingredient.food);
   return perUnit === null ? null : amount * perUnit;
 }
 
@@ -218,6 +224,7 @@ export function recipeNutrition(
       continue;
     }
     if (ingredient.quantity === null) continue; // "salt to taste"
+    if (isPlainWater(ingredient.food)) continue; // no nutrition
     if (!food || food.kcal_100g === null) {
       missing.push({ raw: ingredient.raw, reason: "no food match" });
       continue;
@@ -252,7 +259,9 @@ export async function nutritionForRecipe(
   for (const line of lines) {
     const ingredient = parseIngredient(line);
     const food =
-      ingredient.status === "parsed" && ingredient.quantity !== null
+      ingredient.status === "parsed" &&
+      ingredient.quantity !== null &&
+      !isPlainWater(ingredient.food)
         ? await lookup(lookupName(ingredient))
         : null;
     items.push({ ingredient, food });

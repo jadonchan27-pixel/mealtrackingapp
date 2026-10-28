@@ -122,20 +122,58 @@ describe("ingredientGrams", () => {
     expect(
       ingredientGrams(parsed("3 cloves garlic"), food({ cup: 136 })),
     ).toBeNull();
-    expect(ingredientGrams(parsed("2 eggs"), food({ cup: 243 }))).toBeNull();
+    expect(
+      ingredientGrams(parsed("2 dragon fruits"), food({ cup: 243 })),
+    ).toBeNull();
+  });
+
+  it("falls back to typical weights when the food has none for the unit", () => {
+    // USDA Foundation rice lists only grams.
+    expect(
+      ingredientGrams(parsed("1 cup uncooked long grain white rice"), food({})),
+    ).toBe(185);
+    expect(ingredientGrams(parsed("8 corn tortillas"), food({}))).toBe(208);
+    expect(ingredientGrams(parsed("1 large mango"), food({ cup: 165 }))).toBe(
+      336,
+    );
+    expect(
+      ingredientGrams(parsed("1 can black beans"), food({ cup: 240 })),
+    ).toBe(425);
+    // The food's own weights still come first.
+    expect(ingredientGrams(parsed("2 eggs"), food({ large: 56 }))).toBe(112);
+  });
+
+  it("uses a weight written after the volume", () => {
+    expect(
+      ingredientGrams(parsed("1 cup (165g) diced sweet potatoes"), food({})),
+    ).toBe(165);
   });
 
   it("ignores bad grams_per_unit values", () => {
     expect(
-      ingredientGrams(parsed("2 eggs"), { grams_per_unit: { each: "50" } }),
+      ingredientGrams(parsed("2 dragon fruits"), {
+        grams_per_unit: { each: "50" },
+      }),
     ).toBeNull();
     expect(
-      ingredientGrams(parsed("2 eggs"), { grams_per_unit: [] }),
+      ingredientGrams(parsed("2 dragon fruits"), { grams_per_unit: [] }),
     ).toBeNull();
   });
 });
 
 describe("recipeNutrition", () => {
+  it("counts water as nothing, not as a missing food", () => {
+    const result = recipeNutrition(
+      [
+        { ingredient: parseIngredient("200 g rice"), food: food({}, 130) },
+        { ingredient: parseIngredient("1 cup cold water"), food: null },
+      ],
+      1,
+    );
+    expect(result.total.kcal).toBe(260);
+    expect(result.missing).toEqual([]);
+  });
+
   it("sums nutrition and divides by servings", () => {
     const result = recipeNutrition(
       [
