@@ -16,14 +16,14 @@ Status: ☐ not started · ◐ in progress · ☑ done and validated
 
 ## Phase 1: Foundation
 
-### ◐ Step 1. Project scaffold
+### ☑ Step 1. Project scaffold
 1. Create the Next.js (App Router) TypeScript app with ESLint and Prettier.
 2. Add Vitest with one sample test, and `npm test`, `npm run lint`, `npm run build` scripts.
 3. Add a GitHub Actions workflow that runs lint, test and build on every push.
 
 **Done when:** the app runs locally, CI is green on `main`.
 
-### ☐ Step 2. Database
+### ◐ Step 2. Database
 1. 🧑 Create a free Supabase project and share the URL and keys as environment variables (never committed).
 2. Add `supabase/migrations/001_schema.sql` with every enum and table from the architecture doc.
 3. Add row-level security policies (`user_id = auth.uid()`) to every table.
