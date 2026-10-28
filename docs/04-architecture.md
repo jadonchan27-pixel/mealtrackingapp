@@ -214,7 +214,7 @@ create table weight_entries (
 );
 ```
 
-The `heb_products` table is seeded with estimated prices for common ingredients; new foods get an estimate when first added.
+The `heb_products` table is filled from an estimated price catalog for ~150 common ingredients (`lib/hebCatalog.ts`). Each row belongs to a food, so a food gets its row, and its store section, the first time it's priced; foods the catalog doesn't know get an estimate from their section's default price per gram.
 
 ## API
 

@@ -21,6 +21,7 @@ import {
 } from "@/lib/recipeSearch";
 import type { BraveClient } from "@/lib/services/braveSearch";
 import type { RecipePage } from "@/lib/services/recipePage";
+import { ensureProducts } from "@/lib/products";
 import { scalePortions } from "@/lib/scaling";
 import { MEAL_SLOTS, pickCuisine, type NewWeekInput } from "@/lib/weeks";
 
@@ -554,6 +555,20 @@ export async function finalizeWeek(
       };
     }),
     targets,
+  );
+  // TR-16: every food in the plan has an H-E-B product for the shopping list.
+  const lines = rows(
+    await supabase
+      .from("recipe_ingredients")
+      .select("food_id")
+      .in(
+        "recipe_id",
+        recipes.map((r) => r.id),
+      ),
+  );
+  await ensureProducts(
+    supabase,
+    lines.map((l) => l.food_id).filter((id): id is number => id !== null),
   );
 
   check(

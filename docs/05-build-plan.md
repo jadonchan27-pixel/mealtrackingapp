@@ -129,7 +129,7 @@ Status: ☐ not started · ◐ in progress · ☑ done and validated
 
 **Done when:** with a 3–5 range, every shortlisted recipe has 3 to 5 counted ingredients.
 
-### ◐ Step 14b. Start a week over (US-29, TR-23)
+### ☑ Step 14b. Start a week over (US-29, TR-23)
 1. `resetWeek` in `lib/plans.ts` and `POST /api/weeks/:id/reset`: delete the week's planned log entries, plan items, shopping list, candidates and the week itself. Week views carry `loggedMeals`, the count of logged meals that would be affected.
 2. Plan page: "Start over" on the draft shortlist and the finalized week, with a confirm that warns when `loggedMeals` > 0. After it, the cuisine picker shows.
 
@@ -137,9 +137,10 @@ Status: ☐ not started · ◐ in progress · ☑ done and validated
 
 ## Phase 5: Shopping list
 
-### ☐ Step 15. H-E-B price table (TR-16)
-1. Seed `heb_products` with estimated H-E-B package sizes and prices for ~150 common ingredients.
-2. When a new food has no product, create an estimated one (by section default price per gram).
+### ◐ Step 15. H-E-B price table (TR-16)
+1. `lib/hebCatalog.ts`: estimated H-E-B package sizes, prices and store sections for ~150 common ingredients, matched to a food by name. A `heb_products` row needs a food, so each food gets its row from the catalog the first time it's priced.
+2. When a food matches nothing in the catalog, create an estimated row from its section's default price per gram (the section guessed from the food's name).
+3. Recipe costs (step 11) and finalize (step 13) create any missing rows first.
 
 **Done when:** every food used in a plan maps to a product.
 

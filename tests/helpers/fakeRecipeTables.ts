@@ -8,6 +8,7 @@ const TABLES = [
   "recipes",
   "recipe_ingredients",
   "heb_products",
+  "foods",
   "week_plans",
   "plan_candidates",
   "plan_items",
@@ -20,6 +21,8 @@ const TABLES = [
 const DEFAULTS: Partial<Record<(typeof TABLES)[number], Row>> = {
   week_plans: { cuisines: [], status: "draft" },
   plan_candidates: { selected: false },
+  heb_products: { is_estimate: true },
+  foods: { section: "pantry" },
   log_entries: { status: "planned", portion: 1 },
 };
 
