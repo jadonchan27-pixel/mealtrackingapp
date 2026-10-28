@@ -231,12 +231,37 @@ export function parseLogPatch(
   return { ok: true, patch };
 }
 
-export class LogEntryNotFound extends Error {
-  name = "LogEntryNotFound";
+export class LogError extends Error {
+  name = "LogError";
+  constructor(
+    message: string,
+    readonly status: 404 | 409 = 404,
+  ) {
+    super(message);
+  }
+}
+
+// The day's restaurant entries for a slot.
+async function eatOuts(
+  supabase: Supabase,
+  date: string,
+  slot: MealSlot,
+): Promise<LogEntryRow[]> {
+  return (
+    check(
+      await supabase
+        .from("log_entries")
+        .select("*")
+        .eq("date", date)
+        .eq("slot", slot)
+        .eq("kind", "restaurant"),
+    ) ?? []
+  );
 }
 
 // US-21, US-22: confirms an entry as eaten, marks it skipped (or back to
-// planned), and/or changes the portion eaten.
+// planned), and/or changes the portion eaten. A planned meal that an eat-out
+// replaced stays skipped until the eat-out is removed, so both never count.
 export async function updateLogEntry(
   supabase: Supabase,
   id: number,
@@ -245,8 +270,164 @@ export async function updateLogEntry(
   const row = check(
     await supabase.from("log_entries").select("*").eq("id", id).maybeSingle(),
   );
-  if (!row) throw new LogEntryNotFound("Entry not found");
+  if (!row) throw new LogError("Entry not found");
+  if (
+    row.kind === "planned" &&
+    patch.status !== undefined &&
+    patch.status !== "skipped" &&
+    (await eatOuts(supabase, row.date, row.slot)).length > 0
+  ) {
+    throw new LogError(
+      "You ate out for this meal. Remove the eat-out to bring it back.",
+      409,
+    );
+  }
   check(await supabase.from("log_entries").update(patch).eq("id", id));
   const [entry] = await entryViews(supabase, [{ ...row, ...patch }]);
   return entry;
+}
+
+export type RestaurantInput = {
+  date: string;
+  slot: MealSlot;
+  restaurantName: string | null;
+  itemName: string;
+  // How much of the item was eaten: 1 is all of it.
+  amount: number;
+  // For the whole item.
+  kcal: number;
+  proteinG: number;
+  carbsG: number;
+  fatG: number;
+};
+
+function isMealSlotValue(v: unknown): v is MealSlot {
+  return MEAL_SLOTS.includes(v as MealSlot);
+}
+
+function text(v: unknown, max: number): string | null {
+  if (typeof v !== "string") return null;
+  const t = v.trim().replace(/\s+/g, " ");
+  return t === "" ? null : t.slice(0, max);
+}
+
+const NUTRIENT_LIMITS = {
+  kcal: { label: "Calories", max: 5000 },
+  proteinG: { label: "Protein", max: 500 },
+  carbsG: { label: "Carbs", max: 1000 },
+  fatG: { label: "Fat", max: 500 },
+} as const;
+
+// POST /api/log/restaurant body (US-24).
+export function parseRestaurant(
+  body: unknown,
+  isDate: (s: string) => boolean,
+): { ok: true; input: RestaurantInput } | { ok: false; error: string } {
+  if (typeof body !== "object" || body === null) {
+    return { ok: false, error: "Send the restaurant meal." };
+  }
+  const b = body as Record<string, unknown>;
+  if (typeof b.date !== "string" || !isDate(b.date)) {
+    return { ok: false, error: "date must be YYYY-MM-DD." };
+  }
+  if (!isMealSlotValue(b.slot)) {
+    return { ok: false, error: "Choose which meal it replaces." };
+  }
+  const itemName = text(b.itemName, 120);
+  if (!itemName) return { ok: false, error: "Enter what you ate." };
+  const amount = b.amount ?? 1;
+  if (
+    typeof amount !== "number" ||
+    !Number.isFinite(amount) ||
+    amount < PORTION_STEP ||
+    amount > MAX_PORTION ||
+    !Number.isInteger(amount / PORTION_STEP)
+  ) {
+    return {
+      ok: false,
+      error: "The amount eaten must be in quarters, from ¼ to 10.",
+    };
+  }
+  const values = {} as Pick<
+    RestaurantInput,
+    "kcal" | "proteinG" | "carbsG" | "fatG"
+  >;
+  for (const [key, { label, max }] of Object.entries(NUTRIENT_LIMITS)) {
+    const v = b[key];
+    if (typeof v !== "number" || !Number.isFinite(v) || v < 0 || v > max) {
+      return { ok: false, error: `${label} must be between 0 and ${max}.` };
+    }
+    values[key as keyof typeof values] = Math.round(v * 10) / 10;
+  }
+  return {
+    ok: true,
+    input: {
+      date: b.date,
+      slot: b.slot,
+      restaurantName: text(b.restaurantName, 80),
+      itemName,
+      amount,
+      ...values,
+    },
+  };
+}
+
+// US-24, US-25: the planned meal for that slot is skipped and the restaurant
+// item is added as eaten, so it counts in its place. The rest of the day is
+// left as it is. Returns the day.
+export async function addRestaurantEntry(
+  supabase: Supabase,
+  input: RestaurantInput,
+): Promise<DayLog> {
+  check(
+    await supabase
+      .from("log_entries")
+      .update({ status: "skipped" })
+      .eq("date", input.date)
+      .eq("slot", input.slot)
+      .eq("kind", "planned"),
+  );
+  check(
+    await supabase.from("log_entries").insert({
+      date: input.date,
+      slot: input.slot,
+      kind: "restaurant",
+      status: "confirmed",
+      portion: input.amount,
+      restaurant_name: input.restaurantName,
+      item_name: input.itemName,
+      kcal: input.kcal,
+      protein_g: input.proteinG,
+      carbs_g: input.carbsG,
+      fat_g: input.fatG,
+    }),
+  );
+  return loadDay(supabase, input.date);
+}
+
+// Removes a restaurant entry. When it was the slot's last one, the planned
+// meal goes back to planned. Returns the day.
+export async function deleteRestaurantEntry(
+  supabase: Supabase,
+  id: number,
+): Promise<DayLog> {
+  const row = check(
+    await supabase.from("log_entries").select("*").eq("id", id).maybeSingle(),
+  );
+  if (!row) throw new LogError("Entry not found");
+  if (row.kind !== "restaurant") {
+    throw new LogError("Only an eat-out can be removed.", 409);
+  }
+  check(await supabase.from("log_entries").delete().eq("id", id));
+  if ((await eatOuts(supabase, row.date, row.slot)).length === 0) {
+    check(
+      await supabase
+        .from("log_entries")
+        .update({ status: "planned" })
+        .eq("date", row.date)
+        .eq("slot", row.slot)
+        .eq("kind", "planned"),
+    );
+  }
+  return loadDay(supabase, row.date);
 }

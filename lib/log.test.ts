@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { confirmedTotals, parseLogPatch } from "./log";
+import { confirmedTotals, parseLogPatch, parseRestaurant } from "./log";
+import { isIsoDate } from "./weights";
 
 const n = (kcal: number, proteinG: number, carbsG: number, fatG: number) => ({
   kcal,
@@ -44,5 +45,57 @@ describe("parseLogPatch", () => {
     { portion: "1" },
   ])("refuses %j", (body) => {
     expect(parseLogPatch(body).ok).toBe(false);
+  });
+});
+
+describe("parseRestaurant", () => {
+  const BODY = {
+    date: "2026-11-03",
+    slot: "dinner",
+    restaurantName: "  Torchy's   Tacos ",
+    itemName: "Trailer Park taco",
+    kcal: 570,
+    proteinG: 30,
+    carbsG: 35.25,
+    fatG: 34,
+  };
+
+  it("cleans up the names and defaults the amount to the whole item", () => {
+    expect(parseRestaurant(BODY, isIsoDate)).toEqual({
+      ok: true,
+      input: {
+        date: "2026-11-03",
+        slot: "dinner",
+        restaurantName: "Torchy's Tacos",
+        itemName: "Trailer Park taco",
+        amount: 1,
+        kcal: 570,
+        proteinG: 30,
+        carbsG: 35.3,
+        fatG: 34,
+      },
+    });
+    const noRestaurant = parseRestaurant(
+      { ...BODY, restaurantName: "", amount: 0.5 },
+      isIsoDate,
+    );
+    expect(noRestaurant).toMatchObject({
+      ok: true,
+      input: { restaurantName: null, amount: 0.5 },
+    });
+  });
+
+  it.each([
+    null,
+    { ...BODY, date: "Nov 3" },
+    { ...BODY, slot: "brunch" },
+    { ...BODY, itemName: "  " },
+    { ...BODY, amount: 0 },
+    { ...BODY, amount: 1.1 },
+    { ...BODY, kcal: -5 },
+    { ...BODY, kcal: 6000 },
+    { ...BODY, fatG: "34" },
+  ])("refuses %j", (body) => {
+    expect(parseRestaurant(body, isIsoDate).ok).toBe(false);
   });
 });
