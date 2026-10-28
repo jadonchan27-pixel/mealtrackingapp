@@ -398,3 +398,157 @@ button:disabled {
     grid-template-columns: minmax(0, 2fr) minmax(0, 3fr);
   }
 }
+
+/* Weekly plan and recipes */
+
+.plan-layout {
+  display: grid;
+  gap: 16px;
+}
+
+.plan-summary p {
+  margin: 0 0 12px;
+}
+
+.chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 16px;
+}
+
+.chip {
+  min-height: 40px;
+  border-radius: 999px;
+  background: var(--bg);
+}
+
+.chip[aria-pressed="true"] {
+  border-color: var(--accent);
+  background: var(--accent);
+  color: var(--bg);
+  font-weight: 600;
+}
+
+.link-button {
+  padding: 0;
+  border: none;
+  background: none;
+  color: var(--accent);
+  text-decoration: underline;
+}
+
+.slot-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.slot-header h2 {
+  margin: 0;
+  font-size: 1.25rem;
+}
+
+.candidates {
+  display: grid;
+  gap: 12px;
+  margin: 8px 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.candidate {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.candidate[data-selected] {
+  border-color: var(--accent);
+  box-shadow: inset 0 0 0 1px var(--accent);
+}
+
+.candidate h3 {
+  margin: 0;
+  font-size: 1.0625rem;
+}
+
+.candidate a,
+.recipe-detail a {
+  color: var(--text);
+}
+
+.candidate-photo,
+.recipe-photo {
+  width: 100%;
+  aspect-ratio: 4 / 3;
+  object-fit: cover;
+  border-radius: 8px;
+  background: var(--bg);
+}
+
+.recipe-photo {
+  max-width: 640px;
+  margin-bottom: 12px;
+}
+
+.recipe-photo-empty {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 3rem;
+}
+
+.recipe-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin: 0;
+  color: var(--muted);
+}
+
+.recipe-nutrition {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 6px;
+  margin: 0;
+}
+
+.recipe-nutrition div {
+  padding: 6px;
+  border-radius: 8px;
+  background: var(--bg);
+  text-align: center;
+}
+
+.recipe-nutrition dt {
+  color: var(--muted);
+  font-size: 0.75rem;
+}
+
+.recipe-nutrition dd {
+  margin: 0;
+  font-weight: 700;
+}
+
+.ingredient-list {
+  margin: 8px 0 0;
+  padding-left: 20px;
+}
+
+.recipe-steps li {
+  margin-bottom: 8px;
+}
+
+.picked-badge {
+  margin: 0;
+  color: var(--accent);
+  font-weight: 700;
+}
+
+@media (min-width: 768px) {
+  .candidates {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}

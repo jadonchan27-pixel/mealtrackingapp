@@ -18,8 +18,12 @@ export function isActive(pathname: string, href: string): boolean {
 }
 
 export function NavBar() {
-  const pathname = usePathname();
+  return <NavLinks pathname={usePathname()} />;
+}
 
+// The links with the current section marked. The layout also shows them
+// unmarked while a page with URL params (a recipe) streams in.
+export function NavLinks({ pathname }: { pathname: string }) {
   return (
     <nav className="nav" aria-label="Main">
       {NAV_ITEMS.map(({ href, label, icon }) => {

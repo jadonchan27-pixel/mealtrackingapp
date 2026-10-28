@@ -1,5 +1,5 @@
 import { Suspense } from "react";
-import { NavBar } from "@/components/NavBar";
+import { NavBar, NavLinks } from "@/components/NavBar";
 import { UserMenu } from "@/components/UserMenu";
 
 // Shell for every signed-in page: header, page content and navigation.
@@ -13,7 +13,9 @@ export default function AppLayout({ children }: LayoutProps<"/">) {
           <UserMenu />
         </Suspense>
       </header>
-      <NavBar />
+      <Suspense fallback={<NavLinks pathname="" />}>
+        <NavBar />
+      </Suspense>
       <main className="content">{children}</main>
     </div>
   );

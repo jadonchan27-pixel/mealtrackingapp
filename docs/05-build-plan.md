@@ -90,7 +90,7 @@ Status: ☐ not started · ◐ in progress · ☑ done and validated
 
 **Done when:** a real recipe URL is stored with nutrition; pages without recipe data are skipped.
 
-### ◐ Step 11. Recipe search and ranking (US-8, US-13, US-14, TR-11, TR-13)
+### ☑ Step 11. Recipe search and ranking (US-8, US-13, US-14, TR-11, TR-13)
 1. 🧑 Get a free Brave Search API key.
 2. `lib/services/braveSearch.ts`: query and return result URLs.
 3. `lib/ranking.ts`: filter active time ≤ 60 min and last week's recipes; score by cuisine match, protein per 100 kcal and cost per serving, with tests.
@@ -100,7 +100,7 @@ Status: ☐ not started · ◐ in progress · ☑ done and validated
 
 ## Phase 4: Weekly plan
 
-### ☐ Step 12. Draft plan and shortlist (US-7 to US-10)
+### ◐ Step 12. Draft plan and shortlist (US-7 to US-10)
 1. `POST /api/weeks`, `GET /api/weeks/:weekStart`, `POST /api/weeks/:id/candidates` (one slot per request), `PATCH /api/candidates/:id`.
 2. If no cuisine is given, the app picks one not used last week.
 3. Plan page: choose cuisines for the coming week, run the search slot by slot, show 3 candidates per slot (photo, time, nutrition, ingredients), select or swap.

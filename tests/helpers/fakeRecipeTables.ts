@@ -9,12 +9,19 @@ const TABLES = [
   "recipe_ingredients",
   "heb_products",
   "week_plans",
+  "plan_candidates",
   "plan_items",
 ] as const;
 
+// Column defaults the database fills in on insert.
+const DEFAULTS: Partial<Record<(typeof TABLES)[number], Row>> = {
+  week_plans: { cuisines: [], status: "draft" },
+  plan_candidates: { selected: false },
+};
+
 // An in-memory stand-in for the recipe tables (and the tables recipe search
 // reads) that supports the queries the app makes: select with eq/in filters,
-// insert (optionally returning the row), update and delete.
+// order, insert (optionally returning the row), update and delete.
 export function fakeRecipeTables({
   failIngredientInsert = false,
   seed = {},
@@ -35,8 +42,17 @@ export function fakeRecipeTables({
       let inserted: Row[] = [];
       let changes: Row = {};
       let error: Result["error"] = null;
-      const matches = () =>
-        tables[table].filter((r) => filters.every((f) => f(r)));
+      let sortBy: { column: string; ascending: boolean } | null = null;
+      const matches = () => {
+        const rows = tables[table].filter((r) => filters.every((f) => f(r)));
+        if (!sortBy) return rows;
+        const { column, ascending } = sortBy;
+        return rows.sort(
+          (a, b) =>
+            ((a[column] as number) - (b[column] as number)) *
+            (ascending ? 1 : -1),
+        );
+      };
 
       const builder = {
         select: () => builder,
@@ -46,6 +62,10 @@ export function fakeRecipeTables({
         },
         in(column: string, values: unknown[]) {
           filters.push((r) => values.includes(r[column]));
+          return builder;
+        },
+        order(column: string, { ascending = true } = {}) {
+          sortBy = { column, ascending };
           return builder;
         },
         insert(rows: Row | Row[]) {
@@ -59,6 +79,7 @@ export function fakeRecipeTables({
             user_id: "u1",
             created_at: "",
             updated_at: "",
+            ...DEFAULTS[table as (typeof TABLES)[number]],
             ...r,
           }));
           tables[table].push(...inserted);
@@ -102,5 +123,6 @@ export function fakeRecipeTables({
     recipes: () => tables.recipes as unknown as RecipeRow[],
     ingredients: () =>
       tables.recipe_ingredients as unknown as RecipeIngredientRow[],
+    table: (name: (typeof TABLES)[number]) => tables[name],
   };
 }
