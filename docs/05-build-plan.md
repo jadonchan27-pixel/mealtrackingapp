@@ -151,7 +151,7 @@ Status: ☐ not started · ◐ in progress · ☑ done and validated
 
 **Done when:** the list for a finalized plan shows packages, prices, batch marks and a total.
 
-### ◐ Step 17. Shopping list page (US-19)
+### ☑ Step 17. Shopping list page (US-19)
 1. Shopping page grouped by section with checkboxes and total.
 2. `PATCH /api/shopping-list/:id` for `checked` and `actualPriceCents`; the actual price updates `heb_products` (`is_estimate = false`). `actualPriceCents` is what the whole line cost, so the product's price is that ÷ packages. Other estimated products with the same name and package (foods sharing the line) get it too, and a shared line prefers a corrected product.
 
@@ -159,9 +159,9 @@ Status: ☐ not started · ◐ in progress · ☑ done and validated
 
 ## Phase 6: Daily logging
 
-### ☐ Step 18. Today page (US-20 to US-23, TR-18)
+### ◐ Step 18. Today page (US-20 to US-23, TR-18)
 1. `GET /api/log?date=` with entries and confirmed totals.
-2. `PATCH /api/log/:id` for status and portion.
+2. `PATCH /api/log/:id` for status and portion. Status can go back to planned (undo); portions are in quarters, ¼ to 10.
 3. Today page: each slot with tap-to-confirm, change portion, mark skipped; running totals vs targets.
 
 **Done when:** only confirmed items count toward totals.
