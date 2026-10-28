@@ -1,6 +1,6 @@
 // Cost per serving (US-13, TR-11): each ingredient's share of its H-E-B
-// product's price, by weight, summed and divided by servings. Prices are
-// estimates until the price table is built (step 15).
+// product's price, by weight, summed and divided by servings. Foods with no
+// product yet get one from the price catalog first (step 15).
 
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type {
@@ -8,6 +8,7 @@ import type {
   HebProductRow,
   RecipeIngredientRow,
 } from "@/lib/db/types";
+import { ensureProducts } from "@/lib/products";
 
 type Product = Pick<HebProductRow, "food_id" | "package_grams" | "price_cents">;
 
@@ -71,6 +72,7 @@ export async function updateRecipeCosts(
         .filter((id): id is number => id !== null),
     ),
   ];
+  await ensureProducts(supabase, foodIds);
   const products =
     foodIds.length === 0
       ? { data: [], error: null }
