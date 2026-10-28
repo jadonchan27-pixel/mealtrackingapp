@@ -21,7 +21,7 @@ const chicken: FoodRow = {
   sugar_100g: 0,
   sodium_mg_100g: 0,
   grams_per_unit: {},
-  section: "meat",
+  section: "pantry",
   created_at: "",
   updated_at: "",
 };
