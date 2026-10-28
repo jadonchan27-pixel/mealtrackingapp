@@ -144,16 +144,16 @@ Status: ☐ not started · ◐ in progress · ☑ done and validated
 
 **Done when:** every food used in a plan maps to a product.
 
-### ◐ Step 16. Shopping list generation (US-15 to US-18, TR-15, TR-17)
+### ☑ Step 16. Shopping list generation (US-15 to US-18, TR-15, TR-17)
 1. `lib/shopping.ts`: sum grams per food across recipes and batches, round up to packages, set the batch flag, with tests. Foods that share a product (green onions and scallions) are one line. Staples with no amount ("salt to taste") are one package; water is left out.
 2. Finalize (step 13) also writes `shopping_list_items`.
 3. `GET /api/weeks/:id/shopping-list`: grouped by section, with total. A week finalized before this step gets its list built on its first request.
 
 **Done when:** the list for a finalized plan shows packages, prices, batch marks and a total.
 
-### ☐ Step 17. Shopping list page (US-19)
+### ◐ Step 17. Shopping list page (US-19)
 1. Shopping page grouped by section with checkboxes and total.
-2. `PATCH /api/shopping-list/:id` for `checked` and `actualPriceCents`; the actual price updates `heb_products` (`is_estimate = false`).
+2. `PATCH /api/shopping-list/:id` for `checked` and `actualPriceCents`; the actual price updates `heb_products` (`is_estimate = false`). `actualPriceCents` is what the whole line cost, so the product's price is that ÷ packages. Other estimated products with the same name and package (foods sharing the line) get it too, and a shared line prefers a corrected product.
 
 **Done when:** checking items persists across devices and corrected prices show next week.
 
