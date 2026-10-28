@@ -75,7 +75,7 @@ Status: ☐ not started · ◐ in progress · ☑ done and validated
 
 **Done when:** tests pass.
 
-### ◐ Step 9. Nutrition (TR-8)
+### ☑ Step 9. Nutrition (TR-8)
 1. 🧑 Get a free USDA FoodData Central API key.
 2. `lib/services/usda.ts`: search a food and fetch per-100 g nutrition and portion weights.
 3. `foods` cache: look up by name first, call USDA only on a miss.
@@ -83,7 +83,7 @@ Status: ☐ not started · ◐ in progress · ☑ done and validated
 
 **Done when:** a sample recipe's nutrition is computed and cached foods are reused.
 
-### ☐ Step 10. Recipe page reader (TR-6, TR-9)
+### ◐ Step 10. Recipe page reader (TR-6, TR-9)
 1. `lib/services/recipePage.ts`: fetch a URL and extract the JSON-LD `Recipe` (title, photo, servings, ingredients, steps, prep/cook/total time).
 2. Tests with saved HTML fixtures from a few recipe sites, including one with no recipe data.
 3. Save the recipe, its ingredients (parsed with step 8) and nutrition (step 9) to the database.

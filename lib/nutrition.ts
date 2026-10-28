@@ -171,9 +171,9 @@ export function roundNutrients(n: Nutrients): Nutrients {
   };
 }
 
-export type IngredientWithFood = {
+export type IngredientWithFood<F extends FoodNutrition = FoodNutrition> = {
   ingredient: IngredientResult;
-  food: FoodNutrition | null;
+  food: F | null;
 };
 
 export function recipeNutrition(
@@ -221,8 +221,8 @@ export async function nutritionForRecipe(
   lines: readonly string[],
   servings: number,
   lookup: FoodLookup,
-): Promise<RecipeNutrition & { items: IngredientWithFood[] }> {
-  const items: IngredientWithFood[] = [];
+): Promise<RecipeNutrition & { items: IngredientWithFood<FoodRow>[] }> {
+  const items: IngredientWithFood<FoodRow>[] = [];
   for (const line of lines) {
     const ingredient = parseIngredient(line);
     const food =
