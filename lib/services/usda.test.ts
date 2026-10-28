@@ -5,6 +5,7 @@ import {
   bestMatch,
   createUsdaClient,
   toUsdaFood,
+  type FoodDetails,
   UsdaError,
   usdaApiKey,
 } from "./usda";
@@ -189,6 +190,7 @@ describe("createUsdaClient", () => {
     const onion = {
       fdcId: 790646,
       description: "Onions, yellow, raw",
+      foodNutrients: [{ nutrient: { id: 1008 }, amount: 40 }],
       foodPortions: [
         { amount: 1, gramWeight: 87, measureUnit: { name: "cup" } },
       ],
@@ -240,7 +242,11 @@ describe("createUsdaClient", () => {
   });
 
   it("borrows only whole-item sizes from a different variety", async () => {
-    const cheddar = { fdcId: 328637, description: "Cheese, cheddar" };
+    const cheddar = {
+      fdcId: 328637,
+      description: "Cheese, cheddar",
+      foodNutrients: [{ nutrient: { id: 1008 }, amount: 40 }],
+    };
     const parmesan = {
       fdcId: 171247,
       description: "Cheese, parmesan, grated",
@@ -283,7 +289,11 @@ describe("createUsdaClient", () => {
   });
 
   it("borrows every portion from the plain form of the same food", async () => {
-    const onion = { fdcId: 790646, description: "Onions, yellow, raw" };
+    const onion = {
+      fdcId: 790646,
+      description: "Onions, yellow, raw",
+      foodNutrients: [{ nutrient: { id: 1008 }, amount: 40 }],
+    };
     const legacyOnion = {
       fdcId: 170000,
       description: "Onions, raw",
@@ -344,6 +354,101 @@ describe("createUsdaClient", () => {
     await expect(usda.search("rice")).rejects.toThrow(
       "USDA request failed: 429",
     );
+  });
+
+  it("searches USDA's name for foods it gets wrong", async () => {
+    const fetch = vi.fn().mockResolvedValue(jsonResponse({ foods: [] }));
+    await createUsdaClient({ apiKey: "k", fetch }).findFood(
+      "Red pepper flakes",
+    );
+    expect(new URL(fetch.mock.calls[0][0]).searchParams.get("query")).toBe(
+      "spices pepper red or cayenne",
+    );
+  });
+
+  // Routes Foundation and SR Legacy searches, and food reads, to fixtures.
+  function router(foundation: FoodDetails, legacy: FoodDetails | null = null) {
+    return vi.fn(async (input: string | URL | Request) => {
+      const url = new URL(input instanceof Request ? input.url : input);
+      if (url.pathname.endsWith("/foods/search")) {
+        const found =
+          url.searchParams.get("dataType") === "SR Legacy"
+            ? legacy
+            : foundation;
+        return jsonResponse({
+          foods: found
+            ? [{ fdcId: found.fdcId, description: found.description }]
+            : [],
+        });
+      }
+      const id = Number(url.pathname.split("/").pop());
+      return jsonResponse(id === legacy?.fdcId ? legacy : foundation);
+    });
+  }
+
+  it("works out missing energy from the macros", async () => {
+    const oil: FoodDetails = {
+      fdcId: 748608,
+      description: "Oil, olive, extra virgin",
+      foodNutrients: [{ nutrient: { id: 1004 }, amount: 100 }],
+      foodPortions: [
+        { amount: 1, gramWeight: 13.5, measureUnit: { name: "tablespoon" } },
+      ],
+    };
+    const food = await createUsdaClient({
+      apiKey: "k",
+      fetch: router(oil),
+    }).findFood("extra virgin olive oil");
+    expect(food?.per100g).toMatchObject({ kcal: 900, fatG: 100 });
+  });
+
+  it("takes energy from SR Legacy when the match has no nutrients at all", async () => {
+    const bare: FoodDetails = {
+      fdcId: 748608,
+      description: "Oil, olive, extra virgin",
+      foodPortions: [
+        { amount: 1, gramWeight: 0.91, measureUnit: { name: "ml" } },
+      ],
+    };
+    const legacy: FoodDetails = {
+      fdcId: 171413,
+      description: "Oil, olive, salad or cooking",
+      foodNutrients: [
+        { nutrient: { id: 1008 }, amount: 884 },
+        { nutrient: { id: 1004 }, amount: 100 },
+      ],
+      foodPortions: [{ amount: 1, modifier: "tbsp", gramWeight: 13.5 }],
+    };
+    const food = await createUsdaClient({
+      apiKey: "k",
+      fetch: router(bare, legacy),
+    }).findFood("extra virgin olive oil");
+    expect(food).toMatchObject({
+      fdcId: 171413,
+      per100g: { kcal: 884 },
+      gramsPerUnit: { tbsp: 13.5, ml: 0.91 },
+    });
+  });
+
+  it("gives fats without a volume portion a tablespoon weight", async () => {
+    const ghee = {
+      fdcId: 171314,
+      description: "Butter, Clarified butter (ghee)",
+      foodNutrients: [{ nutrient: { id: 1008 }, amount: 900 }],
+    };
+    const fetch = vi
+      .fn()
+      .mockResolvedValueOnce(
+        jsonResponse({
+          foods: [{ fdcId: 171314, description: ghee.description }],
+        }),
+      )
+      .mockResolvedValueOnce(jsonResponse(ghee))
+      .mockResolvedValue(jsonResponse({ foods: [] }));
+    const food = await createUsdaClient({ apiKey: "k", fetch }).findFood(
+      "ghee",
+    );
+    expect(food?.gramsPerUnit).toEqual({ tbsp: 13.6 });
   });
 
   it("treats a name USDA rejects as no match", async () => {
@@ -408,6 +513,20 @@ describe("bestMatch", () => {
       r(175188, "Beans, black, mature seeds, canned, low sodium"),
     ];
     expect(bestMatch("canned black beans", results)?.fdcId).toBe(175188);
+  });
+
+  it("reads ground spices as the spice and ground meat as meat", () => {
+    const results = [
+      r(171116, "Chicken, ground, raw"),
+      r(170923, "Spices, cumin seed"),
+    ];
+    expect(bestMatch("ground cumin", results)?.fdcId).toBe(170923);
+    expect(
+      bestMatch("ground beef", [
+        r(1, "Beef, ground, 80% lean meat / 20% fat, raw"),
+        r(2, "Beef, chuck, raw"),
+      ])?.fdcId,
+    ).toBe(1);
   });
 
   it("prefers cheddar when the line says cheddar", () => {

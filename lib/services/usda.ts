@@ -3,6 +3,7 @@
 // Foundation and SR Legacy foods are used because they report nutrients per 100 g.
 
 import { normalizeUnit } from "@/lib/ingredients/parse";
+import { isVolumeUnit } from "@/lib/units";
 
 const BASE_URL = "https://api.nal.usda.gov/fdc/v1";
 const DATA_TYPES = ["Foundation", "SR Legacy"];
@@ -116,7 +117,33 @@ export function createUsdaClient(options: UsdaClientOptions = {}) {
   // ("Cheese, parmesan" for "cheddar cheese") lends whole-item sizes alone,
   // since its cup weighs something else. The food's own portions
   // win where both have one.
-  async function findFood(query: string): Promise<UsdaFood | null> {
+  // The best USDA food for an ingredient name, with energy and portion
+  // weights filled in where USDA's own record leaves them out.
+  async function findFood(name: string): Promise<UsdaFood | null> {
+    const query = QUERY_ALIASES[name.trim().toLowerCase()] ?? name;
+    const food = await matchFood(query);
+    if (food === null) return null;
+    return withFatPortions(await withEnergy(query, food));
+  }
+
+  // Some Foundation foods list no energy ("Oil, olive, extra virgin"). Then
+  // it's worked out from the macros, or failing that taken from the best SR
+  // Legacy match that has it.
+  async function withEnergy(query: string, food: UsdaFood): Promise<UsdaFood> {
+    if (food.per100g.kcal !== null) return food;
+    const kcal = atwaterKcal(food.per100g);
+    if (kcal !== null) return { ...food, per100g: { ...food.per100g, kcal } };
+
+    const candidates = await searchRanked(query, ["SR Legacy"]);
+    for (const result of candidates.slice(0, 2)) {
+      if (result.fdcId === food.fdcId) continue;
+      const legacy = await getFood(result.fdcId);
+      if (legacy.per100g.kcal !== null) return withPortionsFrom(legacy, food);
+    }
+    return food;
+  }
+
+  async function matchFood(query: string): Promise<UsdaFood | null> {
     let fdcId: number | null;
     try {
       fdcId = await search(query);
@@ -163,6 +190,42 @@ export function createUsdaClient(options: UsdaClientOptions = {}) {
 
 export type UsdaClient = ReturnType<typeof createUsdaClient>;
 
+// Names USDA's search gets wrong, and what to search for instead. USDA has
+// no garam masala, so curry powder (a similar spice blend) stands in.
+const QUERY_ALIASES: Record<string, string> = {
+  "red pepper flakes": "spices pepper red or cayenne",
+  "crushed red pepper": "spices pepper red or cayenne",
+  "crushed red pepper flakes": "spices pepper red or cayenne",
+  "chili flakes": "spices pepper red or cayenne",
+  "chilli flakes": "spices pepper red or cayenne",
+  "red chili flakes": "spices pepper red or cayenne",
+  "garam masala": "spices curry powder",
+};
+
+// kcal per 100 g from the macros (4 / 4 / 9 kcal per gram), or null when
+// USDA gives none of them.
+function atwaterKcal(per100g: Per100g): number | null {
+  const { proteinG, carbsG, fatG } = per100g;
+  if (proteinG === null && carbsG === null && fatG === null) return null;
+  return Math.round(4 * (proteinG ?? 0) + 4 * (carbsG ?? 0) + 9 * (fatG ?? 0));
+}
+
+// Oils and ghee weigh about 0.92 g per ml.
+const FAT_GRAMS_PER_TBSP = 13.6;
+
+// Fats with no volume portion ("Butter, Clarified butter (ghee)") get a
+// tablespoon weight, since recipes measure them by the spoon.
+function withFatPortions(food: UsdaFood): UsdaFood {
+  const isFat = /^(oil|ghee|lard|shortening)\b|\bghee\b|\bclarified\b/i.test(
+    food.description,
+  );
+  if (!isFat || Object.keys(food.gramsPerUnit).some(isVolumeUnit)) return food;
+  return {
+    ...food,
+    gramsPerUnit: { tbsp: FAT_GRAMS_PER_TBSP, ...food.gramsPerUnit },
+  };
+}
+
 // SR Legacy foods fetched at most when borrowing whole-item sizes.
 const MAX_LEGACY_FETCHES = 4;
 
@@ -188,9 +251,27 @@ function withPortionsFrom(food: UsdaFood, legacy: UsdaFood): UsdaFood {
   };
 }
 
+// Meats sold ground; "ground" means something only next to one of these.
+const GROUND_MEATS = new Set([
+  "beef",
+  "pork",
+  "turkey",
+  "chicken",
+  "lamb",
+  "veal",
+  "bison",
+  "meat",
+  "sausage",
+]);
+
 function wantedWords(query: string): string[] {
-  const wanted = words(query).filter((w) => !IGNORED_QUERY_WORDS.has(w));
-  return wanted.length > 0 ? wanted : words(query);
+  const all = words(query);
+  // "ground cumin" is the spice, not ground chicken; "ground beef" stays.
+  const groundMeans = all.some((w) => GROUND_MEATS.has(w));
+  const wanted = all.filter(
+    (w) => !IGNORED_QUERY_WORDS.has(w) && (w !== "ground" || groundMeans),
+  );
+  return wanted.length > 0 ? wanted : all;
 }
 
 // The word that names the food: the last one ("onion" in "yellow onion").
