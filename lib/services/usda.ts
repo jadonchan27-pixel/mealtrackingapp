@@ -72,13 +72,15 @@ export function createUsdaClient(options: UsdaClientOptions = {}) {
   }
 
   // The best matching food's id, or null when USDA has nothing for the name.
+  // USDA's own first result is often a part or a variety ("egg white" for
+  // "eggs"), so the top results are scored by bestMatch instead.
   async function search(query: string): Promise<number | null> {
     const json = (await get("/foods/search", {
       query,
       dataType: DATA_TYPES.join(","),
-      pageSize: "5",
-    })) as { foods?: { fdcId: number }[] };
-    return json.foods?.[0]?.fdcId ?? null;
+      pageSize: "25",
+    })) as { foods?: SearchResult[] };
+    return bestMatch(query, json.foods ?? [])?.fdcId ?? null;
   }
 
   async function getFood(fdcId: number): Promise<UsdaFood> {
@@ -178,4 +180,122 @@ function portionKey(
       return size === "whole" ? "each" : size;
   }
   return normalizeUnit(head) ?? normalizeUnit(head.split(" ")[0]);
+}
+
+export type SearchResult = {
+  fdcId: number;
+  description: string;
+  dataType?: string;
+};
+
+// Words in an ingredient line that don't change which food it is.
+const IGNORED_QUERY_WORDS = new Set([
+  "a",
+  "and",
+  "of",
+  "the",
+  "or",
+  "fresh",
+  "large",
+  "medium",
+  "small",
+  "extra",
+  "jumbo",
+  "shredded",
+  "grated",
+  "chopped",
+  "diced",
+  "minced",
+  "sliced",
+  "cubed",
+  "packed",
+  "softened",
+  "melted",
+  "room",
+  "temperature",
+  "organic",
+  "plain",
+]);
+
+// Description words that mean a part, form or variety of the food. Penalized
+// unless the ingredient line asks for them.
+const SPECIFIC_WORDS = new Set([
+  "white",
+  "yolk",
+  "glutinous",
+  "substitute",
+  "imitation",
+  "babyfood",
+  "dried",
+  "dehydrated",
+  "powder",
+  "powdered",
+  "frozen",
+  "canned",
+  "fried",
+  "breaded",
+  "reduced",
+  "lowfat",
+  "nonfat",
+  "fat-free",
+  "light",
+  "flavored",
+  "sweetened",
+  "unsweetened",
+  "infant",
+  "formula",
+  "mix",
+  "prepared",
+  "restaurant",
+  "fast",
+  "foods",
+  "brand",
+  "ns",
+  "nfs",
+]);
+
+function words(text: string): string[] {
+  return text
+    .toLowerCase()
+    .split(/[^a-z-]+/)
+    .filter((w) => w !== "")
+    .map((w) => (w.length > 3 && /[^su]s$/.test(w) ? w.slice(0, -1) : w));
+}
+
+// Rule-based pick of the result that best names the ingredient: every query
+// word should appear, extra words cost a little, part and variety words cost
+// more, raw and whole are preferred unless the line says otherwise, and SR
+// Legacy wins ties because it carries household portion weights.
+export function bestMatch(
+  query: string,
+  results: readonly SearchResult[],
+): SearchResult | null {
+  const wanted = words(query).filter((w) => !IGNORED_QUERY_WORDS.has(w));
+  const wantedSet = new Set(wanted.length > 0 ? wanted : words(query));
+  let best: { result: SearchResult; score: number } | null = null;
+
+  results.forEach((result, rank) => {
+    const desc = words(result.description);
+    const descSet = new Set(desc);
+    const covered = [...wantedSet].filter((w) => descSet.has(w)).length;
+    let score = (covered / Math.max(wantedSet.size, 1)) * 100;
+
+    for (const w of descSet) {
+      if (wantedSet.has(w)) continue;
+      score -= SPECIFIC_WORDS.has(w) ? 15 : 2;
+    }
+    if (!wantedSet.has("cooked") && descSet.has("raw")) score += 4;
+    if (
+      descSet.has("whole") &&
+      !wantedSet.has("white") &&
+      !wantedSet.has("yolk")
+    )
+      score += 4;
+    if (result.dataType === "SR Legacy") score += 3;
+    score -= rank * 0.1; // USDA's order breaks remaining ties
+
+    if (!best || score > best.score) best = { result, score };
+  });
+
+  return best === null ? null : (best as { result: SearchResult }).result;
 }
