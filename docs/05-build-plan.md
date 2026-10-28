@@ -54,13 +54,13 @@ Status: ☐ not started · ◐ in progress · ☑ done and validated
 
 **Done when:** tests pass for male and female examples at each activity level.
 
-### ◐ Step 6. Profile (US-4, US-6)
+### ☑ Step 6. Profile (US-4, US-6)
 1. `GET/PUT /api/profile` and `GET /api/targets`.
 2. Profile page: form for age, sex, height, weight, activity; shows the targets.
 
 **Done when:** saving the profile shows updated targets on phone and desktop.
 
-### ☐ Step 7. Weight (US-26, US-27, TR-19)
+### ◐ Step 7. Weight (US-26, US-27, TR-19)
 1. `lib/trend.ts`: 3-entry moving average, with tests.
 2. `GET/POST /api/weights`; posting also updates `profile.weight_lb`.
 3. Weight page: log a weigh-in, Recharts chart of weigh-ins with the trend line.
