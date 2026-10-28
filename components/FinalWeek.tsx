@@ -79,6 +79,9 @@ export function FinalWeek({
             Batch cooking: what to make Sunday and Thursday →
           </Link>
         </p>
+        <p>
+          <Link href="/shopping">Shopping list: what to buy at H-E-B →</Link>
+        </p>
       </section>
 
       <ul className="candidates final-items">

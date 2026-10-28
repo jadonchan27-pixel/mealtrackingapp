@@ -4,6 +4,7 @@ import {
   buildShoppingList,
   groupShoppingList,
   packagesFor,
+  parseShoppingPatch,
   type ShoppingFood,
   type ShoppingProduct,
 } from "./shopping";
@@ -185,5 +186,62 @@ describe("groupShoppingList", () => {
       ["Spices, oils and sauces", ["Salt"]],
     ]);
     expect(list.totalCents).toBe(582);
+  });
+});
+
+describe("buildShoppingList with shared products", () => {
+  it("prices a shared line by the corrected product, whichever food is first", () => {
+    const foods: ShoppingFood[] = [
+      { id: 2, name: "green onions", section: "produce" },
+      { id: 3, name: "scallions", section: "produce" },
+    ];
+    const products = [
+      product(2, 2, "Green onions, bunch", 110, 50),
+      product(3, 3, "Green onions, bunch", 110, 80, false),
+    ];
+    const list = buildShoppingList(
+      [
+        {
+          servingsPerDay: 1,
+          servings: 7,
+          ingredients: [
+            { foodId: 2, grams: 50 },
+            { foodId: 3, grams: 50 },
+          ],
+        },
+      ],
+      foods,
+      products,
+    );
+    expect(list).toHaveLength(1);
+    expect(list[0]).toMatchObject({
+      foodId: 3,
+      hebProductId: 3,
+      packages: 1,
+      priceCents: 80,
+    });
+  });
+});
+
+describe("parseShoppingPatch", () => {
+  it("takes checked and/or a price paid in whole cents", () => {
+    expect(parseShoppingPatch({ checked: true })).toEqual({
+      ok: true,
+      patch: { checked: true },
+    });
+    expect(
+      parseShoppingPatch({ checked: false, actualPriceCents: 499 }),
+    ).toEqual({ ok: true, patch: { checked: false, actualPriceCents: 499 } });
+  });
+
+  it.each([
+    null,
+    {},
+    { checked: "yes" },
+    { actualPriceCents: 4.99 },
+    { actualPriceCents: -1 },
+    { actualPriceCents: 100_001 },
+  ])("refuses %j", (body) => {
+    expect(parseShoppingPatch(body).ok).toBe(false);
   });
 });
