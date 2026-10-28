@@ -221,6 +221,14 @@ async function weekById(supabase: Supabase, id: number): Promise<WeekPlanRow> {
   return week;
 }
 
+// The week with this id; throws PlanError 404 when there's none.
+export async function loadWeekById(
+  supabase: Supabase,
+  id: number,
+): Promise<WeekView> {
+  return weekView(supabase, await weekById(supabase, id));
+}
+
 function assertDraft(week: WeekPlanRow) {
   if (week.status !== "draft") {
     throw new PlanError("This week's plan is already finalized", 409);

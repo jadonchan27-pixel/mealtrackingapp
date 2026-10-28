@@ -11,6 +11,7 @@ const candidates = await import("@/app/api/weeks/[week]/candidates/route");
 const candidate = await import("@/app/api/candidates/[id]/route");
 const recipe = await import("@/app/api/recipes/[id]/route");
 const finalize = await import("@/app/api/weeks/[week]/finalize/route");
+const batches = await import("@/app/api/weeks/[week]/batches/route");
 
 function signedIn(seed: Parameters<typeof fakeRecipeTables>[0] = {}) {
   const db = fakeRecipeTables(seed);
@@ -235,5 +236,19 @@ describe("POST /api/weeks/:id/finalize", () => {
     expect(finalized.status).toBe("final");
     expect(finalized.items).toHaveLength(4);
     expect(db.table("log_entries")).toHaveLength(28);
+  });
+});
+
+describe("GET /api/weeks/:id/batches", () => {
+  it("needs a finalized week", async () => {
+    signedIn({
+      seed: {
+        week_plans: [{ id: 1, week_start: "2026-11-01", status: "draft" }],
+      },
+    });
+    const draft = await batches.GET(request("GET"), params({ week: "1" }));
+    expect(draft.status).toBe(409);
+    const missing = await batches.GET(request("GET"), params({ week: "2" }));
+    expect(missing.status).toBe(404);
   });
 });

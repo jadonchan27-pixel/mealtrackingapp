@@ -74,6 +74,11 @@ export function FinalWeek({
           Finalized. The same meals every day, Sunday to Saturday
           {week.cuisines.length > 0 && ` · ${week.cuisines.join(", ")}`}.
         </p>
+        <p>
+          <Link href="/plan/batches">
+            Batch cooking: what to make Sunday and Thursday →
+          </Link>
+        </p>
       </section>
 
       <ul className="candidates final-items">
