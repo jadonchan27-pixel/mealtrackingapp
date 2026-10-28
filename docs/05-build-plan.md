@@ -31,7 +31,7 @@ Status: ☐ not started · ◐ in progress · ☑ done and validated
 
 **Done when:** the migration applies cleanly and the types compile.
 
-### ◐ Step 3. Google sign-in (US-1, US-2, TR-4, TR-5)
+### ☑ Step 3. Google sign-in (US-1, US-2, TR-4, TR-5)
 1. 🧑 Create Google OAuth credentials and enable the Google provider in Supabase.
 2. Sign-in page and sign-out button.
 3. Middleware: unauthenticated users go to sign-in; any email other than `ALLOWED_EMAIL` is signed out and refused.
@@ -39,7 +39,7 @@ Status: ☐ not started · ◐ in progress · ☑ done and validated
 
 **Done when:** Jadon can sign in; another Google account is refused.
 
-### ☐ Step 4. App shell and PWA (US-3, TR-1, TR-2)
+### ◐ Step 4. App shell and PWA (US-3, TR-1, TR-2)
 1. Responsive layout with navigation: Today, Plan, Shopping, Weight, Profile.
 2. Web app manifest and icons.
 3. Basic service worker so the app can be installed (no offline data yet).
