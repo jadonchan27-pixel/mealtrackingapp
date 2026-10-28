@@ -184,8 +184,9 @@ async function weekView(supabase: Supabase, week: WeekPlanRow) {
   } satisfies WeekView;
 }
 
-// Log entries this week that aren't just planned: a planned meal confirmed
-// or skipped, or a restaurant meal on one of the week's days.
+// Meals logged this week, each day's slot counted once: a planned meal
+// confirmed or skipped, or a restaurant meal (which also skips the planned
+// one, so it isn't counted twice).
 async function loggedMeals(
   supabase: Supabase,
   weekStart: string,
@@ -194,16 +195,17 @@ async function loggedMeals(
   const entries = rows(
     await supabase
       .from("log_entries")
-      .select("kind, status, plan_item_id")
+      .select("date, slot, kind, status, plan_item_id")
       .in("date", weekDates(weekStart)),
   );
-  return entries.filter((e) =>
+  const logged = entries.filter((e) =>
     e.kind === "restaurant"
       ? true
       : e.status !== "planned" &&
         e.plan_item_id !== null &&
         itemIds.includes(e.plan_item_id),
-  ).length;
+  );
+  return new Set(logged.map((e) => `${e.date}|${e.slot}`)).size;
 }
 
 async function itemViews(
@@ -585,6 +587,17 @@ export async function finalizeWeek(
     await supabase.from("plan_items").select("*").eq("week_plan_id", week.id),
   );
   try {
+    // A slot already eaten out (before a Start over) keeps its planned meal
+    // skipped, so the two don't both count.
+    const eatenOut = new Set(
+      rows(
+        await supabase
+          .from("log_entries")
+          .select("date, slot")
+          .eq("kind", "restaurant")
+          .in("date", weekDates(week.week_start)),
+      ).map((e) => `${e.date}|${e.slot}`),
+    );
     const entries = weekDates(week.week_start).flatMap((date) =>
       items.map((item) => ({
         date,
@@ -592,6 +605,9 @@ export async function finalizeWeek(
         kind: "planned" as const,
         plan_item_id: item.id,
         portion: Number(item.servings_per_day),
+        ...(eatenOut.has(`${date}|${item.slot}`)
+          ? { status: "skipped" as const }
+          : {}),
       })),
     );
     check(await supabase.from("log_entries").insert(entries));
