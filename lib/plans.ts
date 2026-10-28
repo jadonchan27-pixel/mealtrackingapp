@@ -90,6 +90,9 @@ export type WeekView = {
   // The finalized week's recipes and servings per day, in slot order; empty
   // while the week is a draft.
   items: PlanItemView[];
+  // Meals already logged this week (confirmed, skipped or eaten out), which
+  // starting over would affect (US-29).
+  loggedMeals: number;
 };
 
 function num(v: number | null): number | null {
@@ -172,7 +175,34 @@ async function weekView(supabase: Supabase, week: WeekPlanRow) {
     status: week.status,
     candidates: await candidateViews(supabase, candidateRows),
     items: await itemViews(supabase, itemRows),
+    loggedMeals: await loggedMeals(
+      supabase,
+      week.week_start,
+      itemRows.map((i) => i.id),
+    ),
   } satisfies WeekView;
+}
+
+// Log entries this week that aren't just planned: a planned meal confirmed
+// or skipped, or a restaurant meal on one of the week's days.
+async function loggedMeals(
+  supabase: Supabase,
+  weekStart: string,
+  itemIds: number[],
+): Promise<number> {
+  const entries = rows(
+    await supabase
+      .from("log_entries")
+      .select("kind, status, plan_item_id")
+      .in("date", weekDates(weekStart)),
+  );
+  return entries.filter((e) =>
+    e.kind === "restaurant"
+      ? true
+      : e.status !== "planned" &&
+        e.plan_item_id !== null &&
+        itemIds.includes(e.plan_item_id),
+  ).length;
 }
 
 async function itemViews(
@@ -564,4 +594,35 @@ export async function finalizeWeek(
     throw err;
   }
   return weekView(supabase, { ...week, status: "final" });
+}
+
+// US-29, TR-23: starts the week over. Deletes its planned log entries (even
+// confirmed or skipped ones), shopping list, plan items, candidates and the
+// week itself, so the plan page goes back to choosing cuisines. Restaurant
+// log entries are kept. Running it again after a failure finishes the job.
+export async function resetWeek(
+  supabase: Supabase,
+  weekId: number,
+): Promise<void> {
+  const week = await weekById(supabase, weekId);
+  const itemIds = rows(
+    await supabase.from("plan_items").select("id").eq("week_plan_id", week.id),
+  ).map((i) => i.id);
+  if (itemIds.length > 0) {
+    check(
+      await supabase
+        .from("log_entries")
+        .delete()
+        .eq("kind", "planned")
+        .in("plan_item_id", itemIds),
+    );
+  }
+  for (const table of [
+    "shopping_list_items",
+    "plan_items",
+    "plan_candidates",
+  ] as const) {
+    check(await supabase.from(table).delete().eq("week_plan_id", week.id));
+  }
+  check(await supabase.from("week_plans").delete().eq("id", week.id));
 }

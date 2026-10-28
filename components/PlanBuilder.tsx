@@ -29,6 +29,24 @@ export function pickedCount(week: WeekView): number {
     .length;
 }
 
+// The confirm shown before starting a week over (US-29), with a warning when
+// meals are already logged.
+export function startOverMessage(
+  week: Pick<WeekView, "weekStart" | "status" | "loggedMeals">,
+): string {
+  const cleared =
+    week.status === "final"
+      ? "the finalized plan, the shortlist and your picks"
+      : "the shortlist and your picks";
+  let message = `Start the week of ${weekLabel(week.weekStart)} over? This clears ${cleared}, and you choose cuisines again.`;
+  if (week.loggedMeals > 0) {
+    const meals =
+      week.loggedMeals === 1 ? "1 meal" : `${week.loggedMeals} meals`;
+    message += ` You've already logged ${meals} this week. Confirmed and skipped planned meals are cleared too; meals you ate out stay.`;
+  }
+  return message;
+}
+
 type SlotStatus =
   | { kind: "idle" }
   | { kind: "searching" }
@@ -53,13 +71,23 @@ export function PlanBuilder({
   const [week, setWeek] = useState(initialWeek);
   const [editingCuisines, setEditingCuisines] = useState(initialWeek === null);
 
+  function startedOver() {
+    setWeek(null);
+    setEditingCuisines(true);
+  }
+
   if (week && week.status === "final") {
     return (
-      <FinalWeek
-        week={week}
-        targets={targets}
-        weekLabel={weekLabel(weekStart)}
-      />
+      <>
+        <FinalWeek
+          week={week}
+          targets={targets}
+          weekLabel={weekLabel(weekStart)}
+        />
+        <section className="card">
+          <StartOver week={week} onReset={startedOver} />
+        </section>
+      </>
     );
   }
 
@@ -80,7 +108,55 @@ export function PlanBuilder({
           week={week}
           onChange={setWeek}
           onEditCuisines={() => setEditingCuisines(true)}
+          onReset={startedOver}
         />
+      )}
+    </div>
+  );
+}
+
+// US-29: deletes the week's plan after a confirm, so cuisines can be chosen
+// again.
+function StartOver({
+  week,
+  disabled = false,
+  onReset,
+}: {
+  week: WeekView;
+  disabled?: boolean;
+  onReset: () => void;
+}) {
+  const [resetting, setResetting] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  async function startOver() {
+    if (!window.confirm(startOverMessage(week))) return;
+    setResetting(true);
+    setError(null);
+    try {
+      await readJson(
+        await fetch(`/api/weeks/${week.id}/reset`, { method: "POST" }),
+      );
+      onReset();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Couldn't start over.");
+      setResetting(false);
+    }
+  }
+
+  return (
+    <div className="start-over">
+      <button
+        type="button"
+        disabled={disabled || resetting}
+        onClick={startOver}
+      >
+        {resetting ? "Starting over…" : "Start over"}
+      </button>
+      {error && (
+        <p role="alert" className="field-error">
+          {error}
+        </p>
       )}
     </div>
   );
@@ -224,10 +300,12 @@ function Shortlist({
   week,
   onChange,
   onEditCuisines,
+  onReset,
 }: {
   week: WeekView;
   onChange: (week: WeekView) => void;
   onEditCuisines: () => void;
+  onReset: () => void;
 }) {
   const [status, setStatus] = useState<Partial<Record<MealSlot, SlotStatus>>>(
     {},
@@ -360,6 +438,11 @@ function Shortlist({
             {finalizeError}
           </p>
         )}
+        <StartOver
+          week={week}
+          disabled={searching || finalizing}
+          onReset={onReset}
+        />
       </section>
 
       {MEAL_SLOTS.map((slot) => (

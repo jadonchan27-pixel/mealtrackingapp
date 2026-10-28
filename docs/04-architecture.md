@@ -231,6 +231,7 @@ Next.js route handlers under `/api`. All require the signed-in allowed user (TR-
 | PATCH | `/api/candidates/:id` | Select a candidate | US-10 |
 | POST | `/api/weeks/:id/finalize` | Build plan items, log entries and shopping list | US-10 to US-15 |
 | GET | `/api/weeks/:id/batches` | Batch cooking quantities | US-12 |
+| POST | `/api/weeks/:id/reset` | Start the week over: delete its plan so cuisines can be chosen again | US-29 |
 | GET | `/api/weeks/:id/shopping-list` | Grouped list and total | US-15 to US-18 |
 | PATCH | `/api/shopping-list/:id` | `{ checked }` or `{ actualPriceCents }` | US-19 |
 | GET | `/api/recipes/:id` | Recipe detail | US-9 |

@@ -601,3 +601,12 @@ button:disabled {
   border-radius: 8px;
   margin-bottom: 8px;
 }
+
+.start-over {
+  margin-top: 12px;
+}
+
+.start-over button {
+  min-height: 44px;
+  padding: 8px 20px;
+}

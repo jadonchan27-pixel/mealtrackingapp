@@ -12,6 +12,7 @@ const TABLES = [
   "plan_candidates",
   "plan_items",
   "log_entries",
+  "shopping_list_items",
   "profile",
 ] as const;
 
