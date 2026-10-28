@@ -2,12 +2,8 @@
 // the calorie target.
 
 import { describe, expect, it } from "vitest";
-import {
-  finalizeWeek,
-  loadWeek,
-  planDailyTotals,
-  weekDates,
-} from "@/lib/plans";
+import { planDailyTotals } from "@/components/FinalWeek";
+import { finalizeWeek, loadWeek, weekDates } from "@/lib/plans";
 import { KCAL_TOLERANCE } from "@/lib/scaling";
 import { fakeRecipeTables } from "@/tests/helpers/fakeRecipeTables";
 

@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useState } from "react";
+import { FinalWeek, type DailyTargets } from "@/components/FinalWeek";
 import { RecipeFacts, RecipePhoto } from "@/components/RecipeFacts";
 import type { MealSlot } from "@/lib/db/types";
 import type { CandidateView, WeekView } from "@/lib/plans";
@@ -43,19 +44,22 @@ async function readJson(res: Response) {
 export function PlanBuilder({
   weekStart,
   initialWeek,
+  targets,
 }: {
   weekStart: string;
   initialWeek: WeekView | null;
+  targets: DailyTargets | null;
 }) {
   const [week, setWeek] = useState(initialWeek);
   const [editingCuisines, setEditingCuisines] = useState(initialWeek === null);
 
   if (week && week.status === "final") {
     return (
-      <section className="card">
-        <h2>Week of {weekLabel(weekStart)}</h2>
-        <p className="muted">This week&apos;s plan is already finalized.</p>
-      </section>
+      <FinalWeek
+        week={week}
+        targets={targets}
+        weekLabel={weekLabel(weekStart)}
+      />
     );
   }
 
@@ -287,6 +291,25 @@ function Shortlist({
 
   const empty = MEAL_SLOTS.filter((s) => week.candidates[s].length === 0);
   const picked = pickedCount(week);
+  const [finalizing, setFinalizing] = useState(false);
+  const [finalizeError, setFinalizeError] = useState<string | null>(null);
+
+  // US-11: scales the picks to the targets and fixes the week's plan.
+  async function finalize() {
+    setFinalizing(true);
+    setFinalizeError(null);
+    try {
+      const json = await readJson(
+        await fetch(`/api/weeks/${week.id}/finalize`, { method: "POST" }),
+      );
+      onChange(json.week);
+    } catch (err) {
+      setFinalizeError(
+        err instanceof Error ? err.message : "Couldn't finalize.",
+      );
+      setFinalizing(false);
+    }
+  }
 
   return (
     <>
@@ -321,6 +344,21 @@ function Shortlist({
                 ? "Find recipes for every meal"
                 : `Find recipes for the other ${empty.length === 1 ? "meal" : `${empty.length} meals`}`}
           </button>
+        )}
+        {picked === MEAL_SLOTS.length && (
+          <button
+            type="button"
+            className="primary"
+            disabled={searching || finalizing}
+            onClick={finalize}
+          >
+            {finalizing ? "Finalizing…" : "Finalize the week"}
+          </button>
+        )}
+        {finalizeError && (
+          <p role="alert" className="field-error">
+            {finalizeError}
+          </p>
         )}
       </section>
 

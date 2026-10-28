@@ -21,7 +21,7 @@ import {
 } from "@/lib/recipeSearch";
 import type { BraveClient } from "@/lib/services/braveSearch";
 import type { RecipePage } from "@/lib/services/recipePage";
-import { dailyTotals, scalePortions } from "@/lib/scaling";
+import { scalePortions } from "@/lib/scaling";
 import { MEAL_SLOTS, pickCuisine, type NewWeekInput } from "@/lib/weeks";
 
 type Supabase = SupabaseClient<Database>;
@@ -546,19 +546,4 @@ export async function finalizeWeek(
     throw err;
   }
   return weekView(supabase, { ...week, status: "final" });
-}
-
-// A finalized week's totals for one day, from its items' servings per day.
-export function planDailyTotals(items: readonly PlanItemView[]) {
-  return dailyTotals(
-    items.map((i) => ({
-      slot: i.slot,
-      recipeId: i.recipe.id,
-      kcal: i.recipe.kcal ?? 0,
-      proteinG: i.recipe.proteinG ?? 0,
-      carbsG: i.recipe.carbsG ?? 0,
-      fatG: i.recipe.fatG ?? 0,
-      servingsPerDay: i.servingsPerDay,
-    })),
-  );
 }
