@@ -12,5 +12,14 @@ npm run dev          # start the app at http://localhost:3000
 npm test             # run unit tests
 npm run lint         # ESLint
 npm run format:check # Prettier
+npm run typecheck    # TypeScript
 npm run build        # production build
 ```
+
+## Configuration
+
+Copy `.env.example` to `.env.local` and fill in the values. `.env.local` is never committed.
+
+## Database
+
+Migrations live in `supabase/migrations/`. Apply them in order (`001_schema.sql`, then `002_rls.sql`) in the Supabase dashboard's SQL Editor. When a migration changes a table, update `lib/db/types.ts` to match.
