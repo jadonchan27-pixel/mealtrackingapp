@@ -121,6 +121,14 @@ Status: ☐ not started · ◐ in progress · ☑ done and validated
 
 **Done when:** batch quantities match servings per day × days.
 
+### ☑ Step 14a. Ingredient count range (US-28, TR-22)
+1. 🧑 Run `supabase/migrations/003_ingredient_range.sql` in the Supabase SQL Editor (adds `min_ingredients` and `max_ingredients` to `profile`).
+2. `lib/ingredientCount.ts`: count a recipe's ingredients without pantry staples, with tests.
+3. Profile page and `/api/profile`: optional min and max ingredients.
+4. Recipe search leaves out recipes outside the range (TR-22).
+
+**Done when:** with a 3–5 range, every shortlisted recipe has 3 to 5 counted ingredients.
+
 ### ◐ Step 14b. Start a week over (US-29, TR-23)
 1. `resetWeek` in `lib/plans.ts` and `POST /api/weeks/:id/reset`: delete the week's planned log entries, plan items, shopping list, candidates and the week itself. Week views carry `loggedMeals`, the count of logged meals that would be affected.
 2. Plan page: "Start over" on the draft shortlist and the finalized week, with a confirm that warns when `loggedMeals` > 0. After it, the cuisine picker shows.

@@ -51,7 +51,7 @@ For each slot (breakfast, lunch, dinner, snack):
 8. Estimate cost per serving from `heb_products`.
 9. Store the recipe and ingredients. Unparseable lines are kept with `food_id = null` and shown to Jadon.
 
-Ranking score per candidate: cuisine match, protein per 100 kcal (higher is better), cost per serving (lower is better). Recipes used in the previous week are excluded (TR-13). The top 3 per slot become candidates, the best one pre-selected.
+Ranking score per candidate: cuisine match, protein per 100 kcal (higher is better), cost per serving (lower is better). Recipes used in the previous week are excluded (TR-13), and so are recipes whose ingredient count (pantry staples left out) is outside the profile's range (TR-22). The top 3 per slot become candidates, the best one pre-selected.
 
 ### Portion scaling (TR-12)
 Meals get ~80% of daily kcal (≈26.7% each), snacks ~20% as 1 or 2 servings. Each slot's servings per day = slot kcal ÷ recipe kcal per serving, rounded to the nearest 0.25. Then protein is checked; if it's short, the highest-protein recipe gets up to +0.5 serving within a 5% kcal tolerance.
@@ -94,7 +94,9 @@ create table profile (
   height_in numeric not null,
   weight_lb numeric not null,
   activity_level activity_level not null,
-  surplus_kcal int not null default 300
+  surplus_kcal int not null default 300,
+  min_ingredients int,                            -- US-28; null = no limit
+  max_ingredients int
 );
 
 create table foods (

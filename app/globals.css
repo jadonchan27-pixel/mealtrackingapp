@@ -568,6 +568,11 @@ button:disabled {
   }
 }
 
+.field-hint {
+  margin: 0;
+  font-size: 0.875rem;
+}
+
 .batch h2 {
   margin: 8px 0 0;
 }
