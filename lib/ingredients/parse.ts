@@ -315,9 +315,14 @@ export function parseIngredient(raw: string): IngredientResult {
     }
   }
 
-  // An alternate measurement right after the unit: "2 cups (480 ml) water"
+  // Parentheses right after the unit: a package size after a count unit
+  // ("1 jar (24 oz) sauce"), otherwise an alternate measurement to drop
+  // ("2 cups (480 ml) water").
   const alt = /^\s*\(([^)]*)\)/.exec(s);
   if (unit !== null && alt) {
+    const isCount = !isVolumeUnit(unit) && !isMassUnit(unit);
+    const inner = isCount && size === null ? parseMeasure(alt[1]) : null;
+    if (inner) size = inner;
     s = s.slice(alt[0].length);
   }
 
