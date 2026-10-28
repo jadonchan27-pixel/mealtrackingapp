@@ -55,6 +55,12 @@ const WHOLE_ITEM_KEYS = [
   "jumbo",
 ];
 
+// Pinches and dashes in ml (1/16 and 1/8 tsp).
+const TINY_ML: Record<string, number> = {
+  pinch: toMl(1, "tsp") / 16,
+  dash: toMl(1, "tsp") / 8,
+};
+
 function gramsPerUnit(
   food: Pick<FoodNutrition, "grams_per_unit">,
 ): Record<string, number> {
@@ -81,10 +87,30 @@ function gramsInOne(
     const known = Object.keys(weights).find(isVolumeUnit);
     return known ? (weights[known] / toMl(1, known)) * toMl(1, unit) : null;
   }
+  if (unit !== null && TINY_ML[unit] !== undefined) {
+    // A pinch or dash: by the food's density, or as water when there's none.
+    const known = Object.keys(weights).find(isVolumeUnit);
+    const gramsPerMl = known ? weights[known] / toMl(1, known) : 1;
+    return TINY_ML[unit] * gramsPerMl;
+  }
   if (unit !== null) return weights[unit] ?? null;
 
-  // No unit ("2 large eggs"): use the size word in the line, then a default size.
+  // No unit, but the food names a counted piece the food has a weight for:
+  // "4 garlic cloves", "2 celery stalks".
   const text = foodText.toLowerCase();
+  const pieces = text
+    .split(/[^a-z]+/)
+    .map((w) => (w.length > 3 && w.endsWith("s") ? w.slice(0, -1) : w));
+  const piece = pieces.find(
+    (w) =>
+      weights[w] !== undefined &&
+      !isVolumeUnit(w) &&
+      !isMassUnit(w) &&
+      !WHOLE_ITEM_KEYS.includes(w),
+  );
+  if (piece) return weights[piece];
+
+  // Otherwise ("2 large eggs"): the size word in the line, then a default size.
   const named = WHOLE_ITEM_KEYS.find(
     (k) => k !== "each" && new RegExp(`\\b${k}\\b`).test(text),
   );

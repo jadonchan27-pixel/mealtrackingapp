@@ -69,6 +69,24 @@ describe("ingredientGrams", () => {
     ).toBeCloseTo(66.78, 2);
   });
 
+  it("weighs a counted piece named in the food", () => {
+    const garlic = food({ clove: 3, cup: 136 });
+    expect(
+      ingredientGrams(parsed("4 garlic cloves, pressed or minced"), garlic),
+    ).toBe(12);
+    expect(ingredientGrams(parsed("1 garlic clove"), garlic)).toBe(3);
+  });
+
+  it("weighs a pinch or dash by density, or as water", () => {
+    // 1/16 tsp of a food at 2 g per tsp
+    expect(
+      ingredientGrams(parsed("Pinch of red pepper flakes"), food({ tsp: 2 })),
+    ).toBeCloseTo(0.125, 3);
+    expect(
+      ingredientGrams(parsed("a dash of hot sauce"), food({})),
+    ).toBeCloseTo(0.62, 2);
+  });
+
   it("uses count units the food knows", () => {
     expect(
       ingredientGrams(parsed("2 slices cheddar"), food({ slice: 28 })),
