@@ -120,6 +120,97 @@ describe("extractRecipe", () => {
   });
 });
 
+describe("extractRecipe on messy real-world JSON-LD", () => {
+  const ld = (json: string) =>
+    `<script type="application/ld+json">${json}</script>`;
+
+  it("reads JSON-LD with raw line breaks inside strings", () => {
+    const html = ld(
+      '{"@type":"Recipe","name":"Soup","recipeYield":"4","recipeIngredient":["1 cup lentils"],"recipeInstructions":"Rinse.\t Simmer for 25\nminutes."}',
+    );
+    expect(html).toContain("Simmer for 25\nminutes");
+    expect(extractRecipe(html, "https://x.test/")).toMatchObject({
+      title: "Soup",
+      steps: ["Rinse. Simmer for 25 minutes."],
+    });
+  });
+
+  it("follows a photo given as an @id reference", () => {
+    const html = ld(
+      JSON.stringify({
+        "@graph": [
+          {
+            "@type": "ImageObject",
+            "@id": "https://x.test/#primaryimage",
+            url: "https://x.test/soup.jpg",
+          },
+          {
+            "@type": "Recipe",
+            name: "Soup",
+            image: { "@id": "https://x.test/#primaryimage" },
+            recipeIngredient: ["1 cup lentils"],
+          },
+        ],
+      }),
+    );
+    expect(extractRecipe(html, "https://x.test/")?.photoUrl).toBe(
+      "https://x.test/soup.jpg",
+    );
+  });
+
+  it("picks the largest photo over thumbnails", () => {
+    const html = ld(
+      JSON.stringify({
+        "@type": "Recipe",
+        name: "Soup",
+        image: [
+          "https://x.test/soup-225x225.jpg",
+          "https://x.test/soup-720x540.jpg",
+          "https://x.test/cookies.jpg?fit=225%2C225",
+        ],
+        recipeIngredient: ["1 cup lentils"],
+      }),
+    );
+    expect(extractRecipe(html, "https://x.test/")?.photoUrl).toBe(
+      "https://x.test/soup-720x540.jpg",
+    );
+  });
+
+  it("treats zero times as not given", () => {
+    const html = ld(
+      JSON.stringify({
+        "@type": "Recipe",
+        name: "Soup",
+        recipeIngredient: ["1 cup lentils"],
+        prepTime: "PT0M",
+        cookTime: "PT0M",
+        totalTime: "PT0M",
+      }),
+    );
+    expect(extractRecipe(html, "https://x.test/")).toMatchObject({
+      prepMinutes: null,
+      cookMinutes: null,
+      totalMinutes: null,
+      activeMinutes: null,
+    });
+  });
+
+  it("splits steps given as one HTML list", () => {
+    const html = ld(
+      JSON.stringify({
+        "@type": "Recipe",
+        name: "Soup",
+        recipeIngredient: ["1 cup lentils"],
+        recipeInstructions: "<ol><li>Rinse.</li><li>Simmer.</li></ol>",
+      }),
+    );
+    expect(extractRecipe(html, "https://x.test/")?.steps).toEqual([
+      "Rinse.",
+      "Simmer.",
+    ]);
+  });
+});
+
 describe("durationMinutes", () => {
   it.each([
     ["PT20M", 20],

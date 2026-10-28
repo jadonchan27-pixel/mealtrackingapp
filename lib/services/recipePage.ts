@@ -64,13 +64,14 @@ export function extractRecipe(html: string, url: string): RecipePage | null {
     const ingredients = textList(node.recipeIngredient ?? node.ingredients);
     if (title === "" || ingredients.length === 0) continue;
 
-    const prepMinutes = durationMinutes(node.prepTime);
-    const cookMinutes = durationMinutes(node.cookTime);
-    const totalMinutes = durationMinutes(node.totalTime);
+    // A zero time ("PT0M") means the site left it blank.
+    const prepMinutes = durationMinutes(node.prepTime) || null;
+    const cookMinutes = durationMinutes(node.cookTime) || null;
+    const totalMinutes = durationMinutes(node.totalTime) || null;
     return {
       url,
       title,
-      photoUrl: imageUrl(node.image, url),
+      photoUrl: imageUrl(node.image, url, nodesById(data)),
       servings: servings(node.recipeYield),
       cuisine: textList(node.recipeCuisine)[0] ?? null,
       ingredients,
@@ -104,7 +105,13 @@ function jsonLdBlocks(html: string): unknown[] {
     try {
       blocks.push(JSON.parse(body));
     } catch {
-      // Some sites ship broken JSON-LD; skip that block.
+      // Raw line breaks and tabs inside strings are invalid JSON but common;
+      // outside strings they're only whitespace, so spaces are safe there too.
+      try {
+        blocks.push(JSON.parse(body.replace(/[\u0000-\u001f]+/g, " ")));
+      } catch {
+        // Otherwise the block is broken; skip it.
+      }
     }
   }
   return blocks;
@@ -209,11 +216,54 @@ export function durationMinutes(v: unknown): number | null {
   return Math.round(d * 1440 + h * 60 + min + sec / 60);
 }
 
-// image may be a URL, a list of URLs, an ImageObject or a list of those.
-function imageUrl(v: unknown, base: string): string | null {
-  const first = Array.isArray(v) ? v[0] : v;
-  const raw = isObject(first) ? (first.url ?? first.contentUrl) : first;
-  const s = text(raw);
+// Every node in a block that has an @id, so references can be followed.
+function nodesById(data: unknown): Map<string, JsonNode> {
+  const nodes = new Map<string, JsonNode>();
+  const walk = (v: unknown, depth: number) => {
+    if (depth > 6) return;
+    if (Array.isArray(v)) v.forEach((item) => walk(item, depth + 1));
+    else if (isObject(v)) {
+      // {"@id": "…"} alone is a reference, not the node itself.
+      if (typeof v["@id"] === "string" && Object.keys(v).length > 1) {
+        nodes.set(v["@id"], v);
+      }
+      Object.values(v).forEach((item) => walk(item, depth + 1));
+    }
+  };
+  walk(data, 0);
+  return nodes;
+}
+
+// image may be a URL, a list of URLs, an ImageObject or a list of those, or
+// a reference to an ImageObject elsewhere in the @graph ({"@id": "…"}). Sites
+// often list thumbnails too, so the largest image wins.
+function imageUrl(
+  v: unknown,
+  base: string,
+  nodes: Map<string, JsonNode>,
+): string | null {
+  let best: { url: string; area: number } | null = null;
+  for (let item of Array.isArray(v) ? v : [v]) {
+    if (
+      isObject(item) &&
+      item.url === undefined &&
+      item.contentUrl === undefined &&
+      typeof item["@id"] === "string"
+    ) {
+      item = nodes.get(item["@id"]);
+    }
+    const url = absoluteUrl(
+      text(isObject(item) ? (item.url ?? item.contentUrl) : item),
+      base,
+    );
+    if (url === null) continue;
+    const area = imageArea(url, isObject(item) ? item : {});
+    if (!best || area > best.area) best = { url, area };
+  }
+  return best?.url ?? null;
+}
+
+function absoluteUrl(s: string, base: string): string | null {
   if (s === "") return null;
   try {
     const u = new URL(s, base);
@@ -225,13 +275,25 @@ function imageUrl(v: unknown, base: string): string | null {
   }
 }
 
+// Pixel area from the ImageObject's size or a size in the URL
+// ("-225x225.jpg", "?fit=225%2C225"). No size usually means the original.
+function imageArea(url: string, node: JsonNode): number {
+  const w = Number(node.width);
+  const h = Number(node.height);
+  if (w > 0 && h > 0) return w * h;
+  const m =
+    url.match(/[-_](\d{2,4})x(\d{2,4})\.[a-z]+(?:\?|$)/i) ??
+    url.match(/[?&](?:fit|resize)=(\d{2,4})(?:%2C|,)(\d{2,4})/i);
+  return m ? Number(m[1]) * Number(m[2]) : Infinity;
+}
+
 // Steps may be one string, a list of strings, HowToSteps, or HowToSections
 // that group HowToSteps.
 function instructionSteps(v: unknown, depth = 0): string[] {
   if (depth > 5 || v === undefined || v === null) return [];
   if (typeof v === "string") {
     return v
-      .split(/\r?\n|<br\s*\/?>|<\/p>/i)
+      .split(/\r?\n|<br\s*\/?>|<\/p>|<\/li>/i)
       .map(text)
       .filter((s) => s !== "");
   }

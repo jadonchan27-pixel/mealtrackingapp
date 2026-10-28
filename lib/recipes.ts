@@ -16,7 +16,10 @@ import { fetchRecipePage, type RecipePage } from "@/lib/services/recipePage";
 export type SaveRecipeResult =
   | { status: "saved"; recipe: RecipeRow; missing: MissingIngredient[] }
   | { status: "exists"; recipe: RecipeRow }
-  | { status: "skipped"; reason: "no recipe data" | "no servings" };
+  | {
+      status: "skipped";
+      reason: "no recipe data" | "no servings" | "no nutrition";
+    };
 
 export async function saveRecipeFromUrl({
   supabase,
@@ -50,6 +53,17 @@ export async function saveRecipeFromUrl({
     page.servings,
     lookup,
   );
+  // A recipe none of whose ingredients could be counted would be saved at
+  // 0 kcal, which would look like a perfect fit to the planner.
+  const counted = items.filter(
+    ({ ingredient }) =>
+      (ingredient.status === "parsed" && ingredient.quantity !== null) ||
+      (ingredient.status === "unparsed" &&
+        ingredient.reason === "no food name"),
+  ).length;
+  if (counted > 0 && missing.length >= counted) {
+    return { status: "skipped", reason: "no nutrition" };
+  }
   const owner = userId ? { user_id: userId } : {};
 
   const saved = await supabase

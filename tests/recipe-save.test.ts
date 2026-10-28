@@ -160,6 +160,21 @@ describe("saveRecipeFromUrl", () => {
     expect(db.recipes()).toHaveLength(0);
   });
 
+  it("skips a recipe none of whose ingredients could be counted", async () => {
+    const db = fakeRecipeTables();
+    const html = `<script type="application/ld+json">{"@type":"Recipe","name":"Mystery","recipeYield":"2","recipeIngredient":["1 cup unobtainium","2 tbsp parsley","salt to taste"]}</script>`;
+
+    const result = await saveRecipeFromUrl({
+      supabase: db.client,
+      url: "https://x.test/mystery",
+      lookup: fakeLookup(),
+      readPage: async (url) => extractRecipe(html, url),
+    });
+
+    expect(result).toEqual({ status: "skipped", reason: "no nutrition" });
+    expect(db.recipes()).toHaveLength(0);
+  });
+
   it("keeps unparsed lines but not headings", async () => {
     const db = fakeRecipeTables();
     const html = `<script type="application/ld+json">{"@type":"Recipe","name":"Salad","recipeYield":"2","recipeIngredient":["For the dressing:","1 tbsp butter","a handful of love"]}</script>`;
