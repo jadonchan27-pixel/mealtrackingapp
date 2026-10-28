@@ -3,7 +3,7 @@ import { PlanBuilder } from "@/components/PlanBuilder";
 import { createClient } from "@/lib/db/server";
 import { loadWeek } from "@/lib/plans";
 import { targetsForProfile } from "@/lib/targets";
-import { upcomingWeekStart } from "@/lib/weeks";
+import { austinToday, upcomingWeekStart } from "@/lib/weeks";
 
 export default function PlanPage() {
   return (
@@ -14,11 +14,6 @@ export default function PlanPage() {
       </Suspense>
     </>
   );
-}
-
-// Today in Austin as YYYY-MM-DD.
-function austinToday(now: Date): string {
-  return now.toLocaleDateString("en-CA", { timeZone: "America/Chicago" });
 }
 
 // Reads the signed-in user's plan for the coming week, so it renders at
