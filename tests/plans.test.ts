@@ -180,7 +180,11 @@ describe("searchSlot and selectCandidate", () => {
         readPage,
         wait,
       });
-      expect(result.candidates).toHaveLength(3);
+      // US-8: every recipe that fits, not only 3.
+      expect(result.candidates.length).toBeGreaterThan(3);
+      expect(result.candidates.map((c) => c.rank)).toEqual(
+        result.candidates.map((_, i) => i + 1),
+      );
       expect(result.candidates[0]).toMatchObject({ rank: 1, selected: true });
       expect(result.candidates.slice(1).every((c) => !c.selected)).toBe(true);
     }
@@ -191,11 +195,13 @@ describe("searchSlot and selectCandidate", () => {
     );
     expect(picked).toEqual([1, 1, 1, 1]);
 
-    // No recipe is shortlisted for two meals.
-    const shortlisted = MEAL_SLOTS.flatMap((slot) =>
-      shortlist.candidates[slot].map((c) => c.recipe.id),
+    // No recipe is picked for two meals.
+    const picks = MEAL_SLOTS.flatMap((slot) =>
+      shortlist.candidates[slot]
+        .filter((c) => c.selected)
+        .map((c) => c.recipe.id),
     );
-    expect(new Set(shortlisted).size).toBe(12);
+    expect(new Set(picks).size).toBe(4);
 
     // Each candidate carries what the card shows.
     expect(shortlist.candidates.breakfast[0].recipe).toMatchObject({
@@ -206,14 +212,28 @@ describe("searchSlot and selectCandidate", () => {
       ingredients: expect.arrayContaining([expect.stringMatching(/ g /)]),
     });
 
-    // Swapping selects the new pick and unselects the old one.
-    const [first, second] = shortlist.candidates.breakfast;
+    // Swapping selects the new pick and unselects the old one. Candidates
+    // can be shared across meals, but not another meal's pick.
+    const pickedIds = new Set(picks);
+    const breakfast = shortlist.candidates.breakfast;
+    const first = breakfast[0];
+    const second = breakfast.find(
+      (c) => c.id !== first.id && !pickedIds.has(c.recipe.id),
+    )!;
     const swapped = await selectCandidate(db.client, second.id);
-    expect(swapped.map((c) => [c.id, c.selected])).toEqual([
-      [first.id, false],
-      [second.id, true],
-      [shortlist.candidates.breakfast[2].id, false],
+    expect(swapped.filter((c) => c.selected).map((c) => c.id)).toEqual([
+      second.id,
     ]);
+    expect(swapped).toHaveLength(breakfast.length);
+    const lunchPick = shortlist.candidates.lunch.find((c) => c.selected)!;
+    const sharedWithLunch = breakfast.find(
+      (c) => c.recipe.id === lunchPick.recipe.id,
+    );
+    if (sharedWithLunch) {
+      await expect(
+        selectCandidate(db.client, sharedWithLunch.id),
+      ).rejects.toMatchObject({ status: 409 });
+    }
     // Other slots keep their picks.
     const after = (await loadWeek(db.client, "2026-11-01"))!;
     expect(after.candidates.lunch.filter((c) => c.selected)).toHaveLength(1);

@@ -1,6 +1,6 @@
 // Recipe search for one meal slot (US-8, architecture "Recipe pipeline"):
 // search the web, read and save each recipe page, price the recipes, and
-// return the top 3 ranked candidates.
+// return the ranked candidates (the top 3 unless asked for more).
 
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Database, MealSlot, RecipeRow } from "@/lib/db/types";
@@ -154,6 +154,9 @@ export type SkippedPage = { url: string; reason: string };
 
 export const SEARCH_PAUSE_MS = 1100;
 
+// Over-cap recipes fill a slot's shortlist up to this many (TR-25).
+export const MIN_CANDIDATES = 3;
+
 function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
@@ -193,7 +196,7 @@ export type SlotSearchResult = {
   skipped: SkippedPage[];
 };
 
-// Searches for each chosen cuisine and slot protein, then reads up to 20 of
+// Searches for each chosen cuisine and slot protein, then reads up to 40 of
 // the results, a few at a time. A search that fails, or a page that can't be
 // read or has no usable recipe, is skipped, not fatal.
 export async function findTopRecipes({
@@ -324,7 +327,9 @@ export async function findTopRecipes({
     limit: costCap ? Infinity : limit,
   });
   return {
-    top: costCap ? applyCostCap(ranked, slot, costCap, limit) : ranked,
+    top: costCap
+      ? applyCostCap(ranked, slot, costCap, limit, MIN_CANDIDATES)
+      : ranked,
     recipes: priced,
     skipped,
   };

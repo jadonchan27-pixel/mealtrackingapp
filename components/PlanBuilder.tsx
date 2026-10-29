@@ -14,6 +14,24 @@ import {
   SLOT_LABELS,
 } from "@/lib/weeks";
 
+// Recipes picked for the week's other meals, by recipe id.
+export function pickedElsewhere(
+  week: WeekView,
+  slot: MealSlot,
+): Map<number, MealSlot> {
+  const picks = new Map<number, MealSlot>();
+  for (const other of MEAL_SLOTS) {
+    if (other === slot) continue;
+    for (const c of week.candidates[other]) {
+      if (c.selected) picks.set(c.recipe.id, other);
+    }
+  }
+  return picks;
+}
+
+// Candidates shown per slot before "Show all" (US-8).
+export const SHORTLIST_SHOWN = 3;
+
 // "Sunday, Nov 1"
 export function weekLabel(weekStart: string): string {
   return new Date(`${weekStart}T00:00:00Z`).toLocaleDateString("en-US", {
@@ -417,7 +435,7 @@ function Shortlist({
         <p className="muted">
           {picked} of {MEAL_SLOTS.length} meals picked.
           {empty.length > 0 &&
-            " Each search reads up to 20 recipe pages and takes about a minute."}
+            " Each search reads up to 40 recipe pages and takes a minute or two."}
         </p>
         {empty.length > 0 && (
           <button
@@ -460,6 +478,7 @@ function Shortlist({
           key={slot}
           slot={slot}
           candidates={week.candidates[slot]}
+          pickedElsewhere={pickedElsewhere(week, slot)}
           costCap={costCap}
           status={status[slot] ?? { kind: "idle" }}
           busy={searching}
@@ -474,6 +493,7 @@ function Shortlist({
 function SlotSection({
   slot,
   candidates,
+  pickedElsewhere,
   costCap,
   status,
   busy,
@@ -482,6 +502,8 @@ function SlotSection({
 }: {
   slot: MealSlot;
   candidates: CandidateView[];
+  // Recipes picked for other meals, by recipe id (US-8: shared candidates).
+  pickedElsewhere: ReadonlyMap<number, MealSlot>;
   costCap: CostCap | null;
   status: SlotStatus;
   busy: boolean;
@@ -490,6 +512,16 @@ function SlotSection({
 }) {
   const [pickError, setPickError] = useState<string | null>(null);
   const [picking, setPicking] = useState<number | null>(null);
+  // US-8: the top 3 that can be picked (and the pick) up front, the rest on
+  // request. Another meal's pick only shows in the full list, marked.
+  const [showAll, setShowAll] = useState(false);
+  const pickable = candidates.filter(
+    (c) => c.selected || !pickedElsewhere.has(c.recipe.id),
+  );
+  const shown = showAll
+    ? candidates
+    : pickable.filter((c, i) => i < SHORTLIST_SHOWN || c.selected);
+  const hidden = pickable.length - shown.length;
 
   async function pick(id: number) {
     setPicking(id);
@@ -544,7 +576,7 @@ function SlotSection({
       )}
       {candidates.length > 0 && (
         <ul className="candidates">
-          {candidates.map((c) => (
+          {shown.map((c) => (
             <li
               key={c.id}
               className="card candidate"
@@ -575,6 +607,10 @@ function SlotSection({
               </details>
               {c.selected ? (
                 <p className="picked-badge">✓ Picked</p>
+              ) : pickedElsewhere.has(c.recipe.id) ? (
+                <button type="button" disabled>
+                  Picked for {SLOT_LABELS[pickedElsewhere.get(c.recipe.id)!]}
+                </button>
               ) : (
                 <button
                   type="button"
@@ -587,6 +623,15 @@ function SlotSection({
             </li>
           ))}
         </ul>
+      )}
+      {(hidden > 0 || showAll) && pickable.length > SHORTLIST_SHOWN && (
+        <button
+          type="button"
+          className="show-all"
+          onClick={() => setShowAll((v) => !v)}
+        >
+          {showAll ? "Show the top 3" : `Show all ${pickable.length} options`}
+        </button>
       )}
     </section>
   );

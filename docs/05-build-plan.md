@@ -190,13 +190,19 @@ Status: ☐ not started · ◐ in progress · ☑ done and validated
 
 **Done when:** two consecutive weeks search different proteins for each slot, and a slot's search reads up to 40 pages.
 
-### ◐ Step 20b. Price limits (US-31, US-32, TR-25, TR-26)
+### ☑ Step 20b. Price limits (US-31, US-32, TR-25, TR-26)
 1. 🧑 Run `supabase/migrations/004_price_limits.sql` in the Supabase SQL Editor (adds `max_cost_cents_per_meal` and `weekly_budget_cents` to `profile`).
 2. Profile page and `/api/profile`: optional max cost per meal and weekly budget, in whole dollars (TR-27).
 3. Candidates: work out each recipe's meal cost at the slot's portion, leave out recipes over the cap, keep unpriced ones marked "price unknown", and fill a short slot with the cheapest over-cap recipes marked "$X over".
 4. Plan page (finalized week) and shopping list: estimated total against the budget, with a warning when over and a count of unpriced items.
 
 **Done when:** with a $4 cap, every shortlisted recipe's meal is at or under $4, unknown or marked over; with an $80 budget, the shopping list shows its total against $80.
+
+### ◐ Step 20c. All candidates (US-8)
+1. Slot search keeps every recipe left after the filters as a ranked candidate, not only the top 3. Over-cap fillers still only fill up to 3 places (TR-25).
+2. Plan page: each slot shows its top 3 (and the pick, if it's further down) with a "Show all N" button for the rest.
+
+**Done when:** a slot search that finds 8 eligible recipes stores 8 ranked candidates, and the Plan page can show and pick any of them.
 
 ---
 
