@@ -13,6 +13,9 @@ export type Profile = {
   // US-28: ingredients a dish may need, pantry staples left out; null = no limit.
   minIngredients: number | null;
   maxIngredients: number | null;
+  // US-31, US-32: whole dollars; null = none.
+  maxMealCost: number | null;
+  weeklyBudget: number | null;
 };
 
 export const ACTIVITY_LEVELS = Object.keys(
@@ -33,6 +36,7 @@ export const LIMITS = {
   heightIn: { min: 36, max: 96 },
   weightLb: { min: 50, max: 1000 },
   ingredients: { min: 1, max: 30 },
+  dollars: { min: 1, max: 1000 },
 } as const;
 
 export type ProfileErrors = Partial<Record<keyof Profile, string>>;
@@ -105,6 +109,25 @@ export function parseProfile(body: unknown): ParseResult {
     errors.maxIngredients = "The most can't be less than the fewest.";
   }
 
+  // TR-27: optional whole dollars; blank means none.
+  const dollars = (key: "maxMealCost" | "weeklyBudget") => {
+    const v = input[key];
+    if (v === null || v === undefined) return null;
+    if (
+      typeof v !== "number" ||
+      !Number.isInteger(v) ||
+      v < LIMITS.dollars.min ||
+      v > LIMITS.dollars.max
+    ) {
+      errors[key] =
+        `Use whole dollars from ${LIMITS.dollars.min} to ${LIMITS.dollars.max}, or leave it blank.`;
+      return null;
+    }
+    return v;
+  };
+  const maxMealCost = dollars("maxMealCost");
+  const weeklyBudget = dollars("weeklyBudget");
+
   if (Object.keys(errors).length > 0) {
     return { ok: false, errors };
   }
@@ -118,6 +141,8 @@ export function parseProfile(body: unknown): ParseResult {
       activityLevel: activityLevel as ActivityLevel,
       minIngredients,
       maxIngredients,
+      maxMealCost,
+      weeklyBudget,
     },
   };
 }
@@ -143,7 +168,17 @@ export function profileFromRow(row: ProfileRow): Profile {
     activityLevel: row.activity_level,
     minIngredients: row.min_ingredients ?? null,
     maxIngredients: row.max_ingredients ?? null,
+    maxMealCost: centsToDollars(row.max_cost_cents_per_meal),
+    weeklyBudget: centsToDollars(row.weekly_budget_cents),
   };
+}
+
+function centsToDollars(cents: number | null | undefined): number | null {
+  return cents === null || cents === undefined ? null : Math.round(cents / 100);
+}
+
+function dollarsToCents(dollars: number | null): number | null {
+  return dollars === null ? null : dollars * 100;
 }
 
 export function profileToRow(
@@ -157,6 +192,8 @@ export function profileToRow(
   | "activity_level"
   | "min_ingredients"
   | "max_ingredients"
+  | "max_cost_cents_per_meal"
+  | "weekly_budget_cents"
 > {
   return {
     age: profile.age,
@@ -166,6 +203,8 @@ export function profileToRow(
     activity_level: profile.activityLevel,
     min_ingredients: profile.minIngredients,
     max_ingredients: profile.maxIngredients,
+    max_cost_cents_per_meal: dollarsToCents(profile.maxMealCost),
+    weekly_budget_cents: dollarsToCents(profile.weeklyBudget),
   };
 }
 

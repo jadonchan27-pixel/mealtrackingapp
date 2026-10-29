@@ -32,6 +32,8 @@ const row = {
   surplus_kcal: 300,
   min_ingredients: 3,
   max_ingredients: 5,
+  max_cost_cents_per_meal: null,
+  weekly_budget_cents: 8000,
   created_at: "2026-10-28T00:00:00Z",
   updated_at: "2026-10-28T00:00:00Z",
 };
@@ -44,6 +46,8 @@ const profile = {
   activityLevel: "sedentary",
   minIngredients: 3,
   maxIngredients: 5,
+  maxMealCost: null,
+  weeklyBudget: 80,
 };
 
 const targets = {
@@ -130,6 +134,8 @@ describe("PUT /api/profile", () => {
         activity_level: "sedentary",
         min_ingredients: 3,
         max_ingredients: 5,
+        max_cost_cents_per_meal: null,
+        weekly_budget_cents: 8000,
       },
       { onConflict: "user_id" },
     ]);
