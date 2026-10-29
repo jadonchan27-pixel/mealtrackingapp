@@ -28,13 +28,16 @@ export function createBraveClient(options: BraveClientOptions = {}) {
   const apiKey = () => options.apiKey ?? braveApiKey();
 
   // Result URLs in Brave's order, without duplicates or non-web links.
+  // `page` 0 is the first page of results, 1 the next `count`, and so on.
   async function search(
     query: string,
     count: number = MAX_RESULTS,
+    page: number = 0,
   ): Promise<string[]> {
     const url = new URL(ENDPOINT);
     url.searchParams.set("q", query);
     url.searchParams.set("count", String(Math.min(count, MAX_RESULTS)));
+    if (page > 0) url.searchParams.set("offset", String(page));
     url.searchParams.set("country", "us");
     url.searchParams.set("search_lang", "en");
     url.searchParams.set("safesearch", "strict");

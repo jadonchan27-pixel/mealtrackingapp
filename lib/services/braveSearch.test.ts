@@ -52,6 +52,15 @@ describe("createBraveClient", () => {
     expect(fetch.mock.calls[0][0].searchParams.get("count")).toBe("20");
   });
 
+  it("asks for a later page of results with offset", async () => {
+    const fetch = vi.fn().mockImplementation(async () => jsonResponse({}));
+    const brave = createBraveClient({ apiKey: "k", fetch });
+    await brave.search("q");
+    await brave.search("q", 20, 1);
+    expect(fetch.mock.calls[0][0].searchParams.has("offset")).toBe(false);
+    expect(fetch.mock.calls[1][0].searchParams.get("offset")).toBe("1");
+  });
+
   it("throws a clear error when Brave fails", async () => {
     const fetch = vi
       .fn()
