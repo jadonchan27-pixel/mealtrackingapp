@@ -6,6 +6,7 @@ import { FinalWeek, type DailyTargets } from "@/components/FinalWeek";
 import { RecipeFacts, RecipePhoto } from "@/components/RecipeFacts";
 import type { MealSlot } from "@/lib/db/types";
 import type { CandidateView, WeekView } from "@/lib/plans";
+import { costTag, type CostCap } from "@/lib/priceLimits";
 import {
   CUISINE_OPTIONS,
   MAX_CUISINES,
@@ -63,10 +64,15 @@ export function PlanBuilder({
   weekStart,
   initialWeek,
   targets,
+  costCap = null,
+  budgetCents = null,
 }: {
   weekStart: string;
   initialWeek: WeekView | null;
   targets: DailyTargets | null;
+  // US-31, US-32: the profile's price limits, if set.
+  costCap?: CostCap | null;
+  budgetCents?: number | null;
 }) {
   const [week, setWeek] = useState(initialWeek);
   const [editingCuisines, setEditingCuisines] = useState(initialWeek === null);
@@ -83,6 +89,7 @@ export function PlanBuilder({
           week={week}
           targets={targets}
           weekLabel={weekLabel(weekStart)}
+          budgetCents={budgetCents}
         />
         <section className="card">
           <StartOver week={week} onReset={startedOver} />
@@ -106,6 +113,7 @@ export function PlanBuilder({
       ) : (
         <Shortlist
           week={week}
+          costCap={costCap}
           onChange={setWeek}
           onEditCuisines={() => setEditingCuisines(true)}
           onReset={startedOver}
@@ -298,11 +306,13 @@ function CuisinePicker({
 
 function Shortlist({
   week,
+  costCap,
   onChange,
   onEditCuisines,
   onReset,
 }: {
   week: WeekView;
+  costCap: CostCap | null;
   onChange: (week: WeekView) => void;
   onEditCuisines: () => void;
   onReset: () => void;
@@ -450,6 +460,7 @@ function Shortlist({
           key={slot}
           slot={slot}
           candidates={week.candidates[slot]}
+          costCap={costCap}
           status={status[slot] ?? { kind: "idle" }}
           busy={searching}
           onSearch={() => search(slot, week)}
@@ -463,6 +474,7 @@ function Shortlist({
 function SlotSection({
   slot,
   candidates,
+  costCap,
   status,
   busy,
   onSearch,
@@ -470,6 +482,7 @@ function SlotSection({
 }: {
   slot: MealSlot;
   candidates: CandidateView[];
+  costCap: CostCap | null;
   status: SlotStatus;
   busy: boolean;
   onSearch: () => void;
@@ -546,6 +559,9 @@ function SlotSection({
                 <Link href={`/recipes/${c.recipe.id}`}>{c.recipe.title}</Link>
               </h3>
               <RecipeFacts recipe={c.recipe} />
+              {costCap && (
+                <CostTag slot={slot} cap={costCap} recipe={c.recipe} />
+              )}
               <details>
                 <summary>
                   Ingredients ({c.recipe.ingredients.length}), serves{" "}
@@ -574,4 +590,22 @@ function SlotSection({
       )}
     </section>
   );
+}
+
+// TR-25: "price unknown" or "$1.20 over" under a cost cap.
+function CostTag({
+  slot,
+  cap,
+  recipe,
+}: {
+  slot: MealSlot;
+  cap: CostCap;
+  recipe: CandidateView["recipe"];
+}) {
+  const tag = costTag(
+    { kcal: recipe.kcal, cost_cents_per_serving: recipe.costCentsPerServing },
+    slot,
+    cap,
+  );
+  return tag ? <p className="cost-tag">{tag}</p> : null;
 }

@@ -22,6 +22,8 @@ export type FormValues = {
   activityLevel: ActivityLevel | "";
   minIngredients: string;
   maxIngredients: string;
+  maxMealCost: string;
+  weeklyBudget: string;
 };
 
 export function toFormValues(profile: Profile | null): FormValues {
@@ -35,6 +37,8 @@ export function toFormValues(profile: Profile | null): FormValues {
       activityLevel: "",
       minIngredients: "",
       maxIngredients: "",
+      maxMealCost: "",
+      weeklyBudget: "",
     };
   }
   const { feet, inches } = inFtIn(profile.heightIn);
@@ -49,6 +53,10 @@ export function toFormValues(profile: Profile | null): FormValues {
       profile.minIngredients === null ? "" : String(profile.minIngredients),
     maxIngredients:
       profile.maxIngredients === null ? "" : String(profile.maxIngredients),
+    maxMealCost:
+      profile.maxMealCost === null ? "" : String(profile.maxMealCost),
+    weeklyBudget:
+      profile.weeklyBudget === null ? "" : String(profile.weeklyBudget),
   };
 }
 
@@ -72,6 +80,8 @@ export function toRequestBody(values: FormValues) {
     // Blank means no limit.
     minIngredients: toLimit(values.minIngredients),
     maxIngredients: toLimit(values.maxIngredients),
+    maxMealCost: toLimit(values.maxMealCost.replace(/^\s*\$/, "")),
+    weeklyBudget: toLimit(values.weeklyBudget.replace(/^\s*\$/, "")),
   };
 }
 
@@ -258,6 +268,44 @@ export function ProfileForm({
             <p className="field-error">
               {errors.minIngredients ?? errors.maxIngredients}
             </p>
+          )}
+        </div>
+
+        <div className="field">
+          <label htmlFor="max-meal-cost">Most a meal can cost ($)</label>
+          <input
+            id="max-meal-cost"
+            inputMode="numeric"
+            placeholder="any"
+            value={values.maxMealCost}
+            onChange={(e) => set("maxMealCost", e.target.value)}
+            aria-invalid={!!errors.maxMealCost}
+          />
+          <p className="muted field-hint">
+            For the portion you&apos;ll eat. Recipe search leaves out dishes
+            over this, unless too few fit. Leave blank for no limit.
+          </p>
+          {errors.maxMealCost && (
+            <p className="field-error">{errors.maxMealCost}</p>
+          )}
+        </div>
+
+        <div className="field">
+          <label htmlFor="weekly-budget">Weekly grocery budget ($)</label>
+          <input
+            id="weekly-budget"
+            inputMode="numeric"
+            placeholder="none"
+            value={values.weeklyBudget}
+            onChange={(e) => set("weeklyBudget", e.target.value)}
+            aria-invalid={!!errors.weeklyBudget}
+          />
+          <p className="muted field-hint">
+            The plan and shopping list show the week&apos;s estimated cost
+            against this. Leave blank for none.
+          </p>
+          {errors.weeklyBudget && (
+            <p className="field-error">{errors.weeklyBudget}</p>
           )}
         </div>
 

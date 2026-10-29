@@ -183,14 +183,14 @@ Status: ☐ not started · ◐ in progress · ☑ done and validated
 
 **Done when:** the full flow works on the live URL from phone and desktop.
 
-### ◐ Step 20a. Wider recipe search (US-30, TR-24)
+### ☑ Step 20a. Wider recipe search (US-30, TR-24)
 1. `lib/recipeSearch.ts`: longer protein lists per slot; pick 3 per week, rotated by the week's date.
 2. `lib/services/braveSearch.ts`: an `offset` option; a query fetches a second page when its first gives fewer than 14 usable links.
 3. Read up to 40 pages per slot (was 20), starting no new page after 240 seconds.
 
 **Done when:** two consecutive weeks search different proteins for each slot, and a slot's search reads up to 40 pages.
 
-### ☐ Step 20b. Price limits (US-31, US-32, TR-25, TR-26)
+### ◐ Step 20b. Price limits (US-31, US-32, TR-25, TR-26)
 1. 🧑 Run `supabase/migrations/004_price_limits.sql` in the Supabase SQL Editor (adds `max_cost_cents_per_meal` and `weekly_budget_cents` to `profile`).
 2. Profile page and `/api/profile`: optional max cost per meal and weekly budget, in whole dollars (TR-27).
 3. Candidates: work out each recipe's meal cost at the slot's portion, leave out recipes over the cap, keep unpriced ones marked "price unknown", and fill a short slot with the cheapest over-cap recipes marked "$X over".

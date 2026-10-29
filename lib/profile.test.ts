@@ -18,6 +18,8 @@ const valid = {
   activityLevel: "moderate",
   minIngredients: null,
   maxIngredients: null,
+  maxMealCost: null,
+  weeklyBudget: null,
 };
 
 describe("parseProfile", () => {
@@ -35,6 +37,15 @@ describe("parseProfile", () => {
     expect(parseProfile({ ...valid, maxIngredients: 8 })).toMatchObject({
       ok: true,
       profile: { minIngredients: null, maxIngredients: 8 },
+    });
+  });
+
+  it("takes optional price limits in whole dollars", () => {
+    expect(
+      parseProfile({ ...valid, maxMealCost: 4, weeklyBudget: 80 }),
+    ).toEqual({
+      ok: true,
+      profile: { ...valid, maxMealCost: 4, weeklyBudget: 80 },
     });
   });
 
@@ -62,6 +73,10 @@ describe("parseProfile", () => {
     ["minIngredients", { minIngredients: 0 }],
     ["maxIngredients", { maxIngredients: 3.5 }],
     ["maxIngredients", { minIngredients: 6, maxIngredients: 4 }],
+    ["maxMealCost", { maxMealCost: 0 }],
+    ["maxMealCost", { maxMealCost: 4.5 }],
+    ["weeklyBudget", { weeklyBudget: 1001 }],
+    ["weeklyBudget", { weeklyBudget: "80" }],
   ])("rejects a bad %s: %o", (field, change) => {
     const result = parseProfile({ ...valid, ...change });
     expect(result.ok).toBe(false);
@@ -93,13 +108,15 @@ describe("row mapping", () => {
     surplus_kcal: 300,
     min_ingredients: null,
     max_ingredients: null,
+    max_cost_cents_per_meal: 400,
+    weekly_budget_cents: null,
     created_at: "2026-10-28T00:00:00Z",
     updated_at: "2026-10-28T00:00:00Z",
   };
 
   it("maps a row to the API shape and back", () => {
     const profile = profileFromRow(row);
-    expect(profile).toEqual(valid);
+    expect(profile).toEqual({ ...valid, maxMealCost: 4 });
     expect(profileToRow(profile)).toEqual({
       age: 25,
       sex: "male",
@@ -108,6 +125,8 @@ describe("row mapping", () => {
       activity_level: "moderate",
       min_ingredients: null,
       max_ingredients: null,
+      max_cost_cents_per_meal: 400,
+      weekly_budget_cents: null,
     });
   });
 });

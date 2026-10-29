@@ -1,12 +1,11 @@
 "use client";
 
 import { useState } from "react";
+import { BudgetLine } from "@/components/Budget";
+import { budgetStatus, formatPrice } from "@/lib/priceLimits";
 import type { ShoppingItemView, ShoppingList } from "@/lib/shopping";
 
-// 1234 → "$12.34"
-export function formatPrice(cents: number): string {
-  return `$${(cents / 100).toFixed(2)}`;
-}
+export { formatPrice };
 
 // "12.5", "$12.50" → 1250; anything else → null.
 export function parseDollars(text: string): number | null {
@@ -49,7 +48,14 @@ async function patchItem(
 
 // US-15 to US-19: the week's list by section. Checking an item saves right
 // away, so the list is the same on the phone and the desktop.
-export function ShoppingListView({ initial }: { initial: ShoppingList }) {
+export function ShoppingListView({
+  initial,
+  budgetCents = null,
+}: {
+  initial: ShoppingList;
+  // US-32: the profile's weekly budget, if set.
+  budgetCents?: number | null;
+}) {
   const [list, setList] = useState(initial);
   const [error, setError] = useState<string | null>(null);
   const totals = listTotals(list);
@@ -90,6 +96,9 @@ export function ShoppingListView({ initial }: { initial: ShoppingList }) {
           {totals.checked} of {totals.count} items in the cart ·{" "}
           {formatPrice(totals.leftCents)} left
         </p>
+        {budgetCents !== null && (
+          <BudgetLine status={budgetStatus(list, budgetCents)} />
+        )}
         {error && (
           <p role="alert" className="field-error">
             {error}

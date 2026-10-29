@@ -23,6 +23,7 @@ import type { BraveClient } from "@/lib/services/braveSearch";
 import type { RecipePage } from "@/lib/services/recipePage";
 import { ensureProducts } from "@/lib/products";
 import { scalePortions } from "@/lib/scaling";
+import { targetsForProfile } from "@/lib/targets";
 import { MEAL_SLOTS, pickCuisine, type NewWeekInput } from "@/lib/weeks";
 
 type Supabase = SupabaseClient<Database>;
@@ -358,12 +359,14 @@ export async function searchSlot({
   }
 
   const profile = check(
-    await supabase
-      .from("profile")
-      .select("min_ingredients, max_ingredients")
-      .maybeSingle(),
+    await supabase.from("profile").select("*").maybeSingle(),
   );
+  const capCents = profile?.max_cost_cents_per_meal ?? null;
   const found = await findTopRecipes({
+    costCap:
+      profile && capCents !== null
+        ? { cents: capCents, dailyKcal: targetsForProfile(profile).kcal }
+        : undefined,
     ingredientRange: {
       min: profile?.min_ingredients ?? null,
       max: profile?.max_ingredients ?? null,

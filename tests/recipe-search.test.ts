@@ -265,6 +265,30 @@ describe("findTopRecipes", () => {
     expect(result.top).toEqual([]);
   });
 
+  it("leaves out meals over the cost cap, filling with the cheapest", async () => {
+    const db = fakeRecipeTables({ seed: { heb_products: PRODUCTS } });
+    const { brave, readPage, lookup } = fakes();
+
+    const result = await findTopRecipes({
+      supabase: db.client,
+      brave,
+      lookup,
+      readPage,
+      slot: "dinner",
+      cuisines: ["Indian"],
+      wait: noWait,
+      // 640 kcal a dinner: Dal 1¾ servings $1.40, Paneer 1 serving $2.45,
+      // Tandoori 1½ servings $4.05, Pasta 1¾ servings $5.25.
+      costCap: { cents: 300, dailyKcal: 2400 },
+    });
+
+    expect(result.top.map((r) => r.recipe.title)).toEqual([
+      "Dal",
+      "Paneer rice bowl",
+      "Tandoori chicken and rice",
+    ]);
+  });
+
   it("starts no new page after the deadline", async () => {
     const db = fakeRecipeTables({ seed: { heb_products: PRODUCTS } });
     const { brave, readPage, lookup } = fakes();

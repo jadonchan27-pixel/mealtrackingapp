@@ -12,6 +12,8 @@ describe("profile form values", () => {
       activityLevel: "",
       minIngredients: "",
       maxIngredients: "",
+      maxMealCost: "",
+      weeklyBudget: "",
     });
   });
 
@@ -24,6 +26,8 @@ describe("profile form values", () => {
       activityLevel: "light",
       minIngredients: 3,
       maxIngredients: null,
+      maxMealCost: 4,
+      weeklyBudget: null,
     });
     expect(values).toEqual({
       age: "25",
@@ -34,6 +38,8 @@ describe("profile form values", () => {
       activityLevel: "light",
       minIngredients: "3",
       maxIngredients: "",
+      maxMealCost: "4",
+      weeklyBudget: "",
     });
   });
 
@@ -47,6 +53,8 @@ describe("profile form values", () => {
         activityLevel: "light",
         minIngredients: null,
         maxIngredients: null,
+        maxMealCost: null,
+        weeklyBudget: null,
       }).inches,
     ).toBe("10");
   });
@@ -62,6 +70,8 @@ describe("profile form values", () => {
         activityLevel: "active",
         minIngredients: "3",
         maxIngredients: " ",
+        maxMealCost: "$5",
+        weeklyBudget: "",
       }),
     ).toEqual({
       age: 25,
@@ -71,6 +81,8 @@ describe("profile form values", () => {
       activityLevel: "active",
       minIngredients: 3,
       maxIngredients: null,
+      maxMealCost: 5,
+      weeklyBudget: null,
     });
   });
 
@@ -84,6 +96,8 @@ describe("profile form values", () => {
       activityLevel: "",
       minIngredients: "",
       maxIngredients: "",
+      maxMealCost: "",
+      weeklyBudget: "",
     });
     expect(body.heightIn).toBe(72);
     expect(body.age).toBeNaN();

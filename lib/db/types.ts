@@ -50,6 +50,9 @@ export type ProfileRow = Timestamps & {
   // US-28: ingredients a dish may need, pantry staples left out; null = no limit.
   min_ingredients: number | null;
   max_ingredients: number | null;
+  // US-31, US-32: price limits in cents; null = none.
+  max_cost_cents_per_meal: number | null;
+  weekly_budget_cents: number | null;
 };
 
 export type FoodRow = Timestamps & {
@@ -181,7 +184,12 @@ export type Database = {
     Tables: {
       profile: TableDef<
         ProfileRow,
-        Defaulted | "surplus_kcal" | "min_ingredients" | "max_ingredients"
+        | Defaulted
+        | "surplus_kcal"
+        | "min_ingredients"
+        | "max_ingredients"
+        | "max_cost_cents_per_meal"
+        | "weekly_budget_cents"
       >;
       foods: TableDef<
         FoodRow,
