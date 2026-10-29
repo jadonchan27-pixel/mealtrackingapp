@@ -34,7 +34,14 @@ async function WeekList() {
   const today = austinToday(new Date());
   let found: { weekStart: string; list: ShoppingList } | null = null;
   let message: string | null = null;
+  let budgetCents: number | null = null;
   try {
+    const profile = await supabase
+      .from("profile")
+      .select("weekly_budget_cents")
+      .maybeSingle();
+    if (profile.error) throw new Error(profile.error.message);
+    budgetCents = profile.data?.weekly_budget_cents ?? null;
     for (const weekStart of [
       upcomingWeekStart(today),
       currentWeekStart(today),
@@ -62,7 +69,7 @@ async function WeekList() {
   return (
     <>
       <p className="muted">Week of {shortDate(found.weekStart)}</p>
-      <ShoppingListView initial={found.list} />
+      <ShoppingListView initial={found.list} budgetCents={budgetCents} />
     </>
   );
 }

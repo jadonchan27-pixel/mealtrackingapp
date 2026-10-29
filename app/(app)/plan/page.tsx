@@ -34,7 +34,18 @@ async function UpcomingWeek() {
     return <p role="alert">Couldn&apos;t load your plan: {message}</p>;
   }
   const targets = profile.data ? targetsForProfile(profile.data) : null;
+  const capCents = profile.data?.max_cost_cents_per_meal ?? null;
   return (
-    <PlanBuilder weekStart={weekStart} initialWeek={week} targets={targets} />
+    <PlanBuilder
+      weekStart={weekStart}
+      initialWeek={week}
+      targets={targets}
+      costCap={
+        targets && capCents !== null
+          ? { cents: capCents, dailyKcal: targets.kcal }
+          : null
+      }
+      budgetCents={profile.data?.weekly_budget_cents ?? null}
+    />
   );
 }

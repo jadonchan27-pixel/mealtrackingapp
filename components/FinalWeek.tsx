@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { WeekBudget } from "@/components/Budget";
 import { RecipePhoto } from "@/components/RecipeFacts";
 import type { PlanItemView, WeekView } from "@/lib/plans";
 import { dailyTotals } from "@/lib/scaling";
@@ -53,10 +54,13 @@ export function FinalWeek({
   week,
   targets,
   weekLabel,
+  budgetCents = null,
 }: {
   week: WeekView;
   targets: DailyTargets | null;
   weekLabel: string;
+  // US-32: the profile's weekly budget, if set.
+  budgetCents?: number | null;
 }) {
   const totals = planDailyTotals(week.items);
   const rows: [string, keyof DailyTargets, string][] = [
@@ -82,6 +86,9 @@ export function FinalWeek({
         <p>
           <Link href="/shopping">Shopping list: what to buy at H-E-B →</Link>
         </p>
+        {budgetCents !== null && (
+          <WeekBudget weekId={week.id} budgetCents={budgetCents} />
+        )}
       </section>
 
       <ul className="candidates final-items">

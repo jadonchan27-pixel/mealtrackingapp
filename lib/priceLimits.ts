@@ -8,6 +8,11 @@ import type { ShoppingList } from "@/lib/shopping";
 
 const MEALS_PER_DAY = 3;
 
+// 1234 → "$12.34"
+export function formatPrice(cents: number): string {
+  return `$${(cents / 100).toFixed(2)}`;
+}
+
 // Servings a recipe would be eaten at in a slot: the meals share 80% of the
 // day's calories evenly; the snack is 1 or 2 servings, whichever is nearer
 // its 20%. Unknown calories count as 1 serving.
@@ -100,10 +105,12 @@ export function budgetStatus(
   budgetCents: number,
 ): BudgetStatus {
   const items = list.sections.flatMap((s) => s.items);
+  // From the lines, so prices entered since the list loaded count.
+  const totalCents = items.reduce((t, i) => t + i.priceCents, 0);
   return {
-    totalCents: list.totalCents,
+    totalCents,
     budgetCents,
-    over: list.totalCents > budgetCents,
+    over: totalCents > budgetCents,
     unpriced: items.filter(isUnpriced).length,
   };
 }

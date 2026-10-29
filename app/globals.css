@@ -802,3 +802,16 @@ button:disabled {
 .eat-out-button {
   min-height: 44px;
 }
+
+/* US-31: "price unknown" or "$1.20 over" on a candidate. */
+.cost-tag {
+  margin: 0;
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: var(--muted);
+}
+
+/* US-32: the week's estimated cost against the budget. */
+.budget p {
+  margin: 4px 0 0;
+}
