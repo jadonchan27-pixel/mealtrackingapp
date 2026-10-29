@@ -1,6 +1,11 @@
 import { describe, expect, it } from "vitest";
 import type { WeekView } from "@/lib/plans";
-import { pickedCount, startOverMessage, weekLabel } from "./PlanBuilder";
+import {
+  pickedCount,
+  pickedElsewhere,
+  startOverMessage,
+  weekLabel,
+} from "./PlanBuilder";
 
 describe("weekLabel", () => {
   it("names the Sunday the week starts", () => {
@@ -21,6 +26,29 @@ describe("pickedCount", () => {
       },
     } as unknown as WeekView;
     expect(pickedCount(week)).toBe(2);
+  });
+});
+
+describe("pickedElsewhere", () => {
+  it("maps the other meals' picks by recipe", () => {
+    const c = (recipeId: number, selected: boolean) =>
+      ({
+        selected,
+        recipe: { id: recipeId },
+      }) as WeekView["candidates"]["lunch"][number];
+    const week = {
+      candidates: {
+        breakfast: [c(1, true), c(2, false)],
+        lunch: [c(2, true), c(1, false)],
+        dinner: [c(3, false)],
+        snack: [],
+      },
+    } as unknown as WeekView;
+    expect([...pickedElsewhere(week, "lunch")]).toEqual([[1, "breakfast"]]);
+    expect([...pickedElsewhere(week, "dinner")]).toEqual([
+      [1, "breakfast"],
+      [2, "lunch"],
+    ]);
   });
 });
 

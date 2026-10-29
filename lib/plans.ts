@@ -323,10 +323,10 @@ export type SlotSearch = {
   skipped: SkippedPage[];
 };
 
-// US-8: searches the web for one slot and replaces its candidates with the
-// top 3, the best one selected. Recipes from last week are left out (TR-13),
-// and so are recipes already shortlisted for this week's other slots, so the
-// same recipe can't end up in two meals.
+// US-8: searches the web for one slot and replaces its candidates with
+// every recipe that fits, ranked, the best one selected. Recipes from last
+// week are left out (TR-13), and so are the recipes picked for this week's
+// other meals, so the same recipe can't end up in two meals.
 export async function searchSlot({
   supabase,
   weekId,
