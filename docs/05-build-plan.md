@@ -183,7 +183,7 @@ Status: ☐ not started · ◐ in progress · ☑ done and validated
 
 **Done when:** the full flow works on the live URL from phone and desktop.
 
-### ☐ Step 20a. Wider recipe search (US-30, TR-24)
+### ◐ Step 20a. Wider recipe search (US-30, TR-24)
 1. `lib/recipeSearch.ts`: longer protein lists per slot; pick 3 per week, rotated by the week's date.
 2. `lib/services/braveSearch.ts`: an `offset` option; each query fetches 2 pages.
 3. Read up to 40 pages per slot (was 20), keeping the slot in one request under 300 seconds.
