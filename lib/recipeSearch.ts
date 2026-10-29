@@ -70,21 +70,50 @@ export function searchQuery(
   slot: MealSlot,
   cuisine?: string,
   protein?: string,
+  prefix?: string,
 ): string {
   // The lunch-and-dinner dish searches as dinner, for a full meal.
   const word = slot === SHARED_SLOT ? "dinner" : slot;
-  return [cuisine?.trim(), protein, word, "recipe"].filter(Boolean).join(" ");
+  return [prefix, cuisine?.trim(), protein, word, "recipe"]
+    .filter(Boolean)
+    .join(" ");
 }
 
-// One search per cuisine (or one with none) and protein of the week.
+// TR-28: with an ingredient limit or a cost cap, each search first asks for
+// simple recipes ("easy 5 ingredient", "cheap easy few ingredient"), since
+// most ordinary recipes have too many ingredients and are dropped after
+// they're read.
+export type SimpleSearch = { maxIngredients?: number | null; cheap?: boolean };
+
+export function simplePrefix({ maxIngredients, cheap }: SimpleSearch = {}):
+  string | null {
+  const few =
+    maxIngredients == null
+      ? null
+      : maxIngredients <= 6
+        ? "5 ingredient"
+        : "few ingredient";
+  if (!few && !cheap) return null;
+  return [cheap && "cheap", "easy", few].filter(Boolean).join(" ");
+}
+
+// One search per cuisine (or one with none) and protein of the week; under
+// TR-28 each is preceded by its simple-recipe search.
 export function searchQueries(
   slot: MealSlot,
   cuisines: readonly string[] = [],
   weekStart?: string,
+  simple?: SimpleSearch,
 ): string[] {
   const chosen = cuisines.length > 0 ? cuisines : [undefined];
   const proteins = weekProteins(slot, weekStart);
-  return chosen.flatMap((c) => proteins.map((p) => searchQuery(slot, c, p)));
+  const prefix = simplePrefix(simple);
+  return chosen.flatMap((c) =>
+    proteins.flatMap((p) => [
+      ...(prefix ? [searchQuery(slot, c, p, prefix)] : []),
+      searchQuery(slot, c, p),
+    ]),
+  );
 }
 
 // Brave result pages fetched per search (TR-24). The second page is only
@@ -249,7 +278,11 @@ export async function findTopRecipes({
   const skipped: SkippedPage[] = [];
   let searchError: unknown = null;
   let searches = 0;
-  for (const q of searchQueries(slot, cuisines, weekStart)) {
+  const simple = {
+    maxIngredients: ingredientRange?.max ?? null,
+    cheap: costCap !== undefined,
+  };
+  for (const q of searchQueries(slot, cuisines, weekStart, simple)) {
     const list: string[] = [];
     for (let page = 0; page < SEARCH_PAGES; page++) {
       // Brave's free plan allows about one request per second.

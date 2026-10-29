@@ -50,6 +50,7 @@ _Builds on [01-project-plan.md](01-project-plan.md) and the step 2 facet docs (`
 - **US-30** As Jadon, the recipe search looks wider: more kinds of protein (not just chicken and beef for dinner), rotating from week to week, and more pages per meal.
 - **US-31** As Jadon, I can set a maximum cost per meal (e.g. $4) on my profile, and the shortlist only offers dishes whose meal, at the portion I'll actually eat, costs at or under it. A dish the app can't price yet is still offered, marked "price unknown". The rest still come after them, cheapest first, behind "Show all" (US-8), each marked with how far over it is.
 - **US-33** As Jadon, to keep costs down, each week has only two dishes: breakfast, and one dish I cook once and eat for both lunch and dinner. There is no snack. Weeks planned before this change keep their meals.
+- **US-34** As Jadon, when I set a max number of ingredients or a max cost per meal, the search looks for simple, cheap recipes on purpose, so more of what it finds fits my limits.
 - **US-32** As Jadon, I can set a weekly grocery budget (e.g. $80) on my profile, and the finalized week on the Plan page and the shopping list show the estimated total against it, with a warning when it's over.
 
 ### Shopping list
@@ -102,6 +103,7 @@ _Builds on [01-project-plan.md](01-project-plan.md) and the step 2 facet docs (`
 - **TR-25** Cost cap: a candidate's meal cost is its cost per serving × the servings that meal needs (the slot's calorie share ÷ the recipe's kcal per serving, as in TR-12). Recipes with no cost count as fitting and are shown as "price unknown". In-cap recipes keep the normal ranking and come first; recipes whose meal cost is over the profile's `max_cost_cents_per_meal` follow, cheapest first, each showing how much it's over, so the top 3 are in-cap whenever 3 fit and "Show all" lists every option. No cap set means no limit.
 - **TR-26** Weekly budget: the finalized week on the Plan page and the shopping list show the estimated weekly total (the shopping list total, using receipt-corrected prices where entered) beside `weekly_budget_cents`, with a warning when the total is higher and a count of items with no price. No budget set means nothing is shown.
 - **TR-27** Price settings are whole dollars from 1 to 1,000, stored in cents; blank means none.
+- **TR-28** Simple-recipe searches: when the profile sets `max_ingredients` or `max_cost_cents_per_meal`, each cuisine-and-protein search (TR-24) is preceded by one with a prefix: "easy", plus "5 ingredient" when the max is 6 or less or "few ingredient" when it is higher, and "cheap" first when a cost cap is set (e.g. "cheap easy few ingredient Mexican chicken dinner recipe"). The plain search still runs after it. Links are still taken from all searches in turn and the 40-page and 240-second limits are unchanged.
 
 ### Shopping and pricing
 - **TR-15** Ingredient aggregation across recipes with unit conversion.

@@ -212,10 +212,15 @@ Status: ☐ not started · ◐ in progress · ☑ done and validated
 
 **Done when:** a new week finalizes with 2 plan items, and each day has breakfast, lunch and dinner log entries, lunch and dinner the same recipe at half its servings each.
 
-### ◐ Step 20e. Every option under a cost cap (US-8, US-31, TR-25)
+### ☑ Step 20e. Every option under a cost cap (US-8, US-31, TR-25)
 1. With a max cost per meal set, slot search keeps over-cap recipes as candidates after the in-cap ones, cheapest first, instead of only filling up to 3 places. They show behind "Show all", each tagged with how far over it is.
 
 **Done when:** under a cap, a slot search's candidates are every recipe left after the other filters, in-cap ones first in rank order, then over-cap ones cheapest first.
+
+### ◐ Step 20f. Search for simple recipes (US-34, TR-28)
+1. With a max ingredients or a max cost per meal on the profile, each slot search runs a "cheap easy few ingredient" (or "easy 5 ingredient") version of each cuisine-and-protein search before the plain one.
+
+**Done when:** with a max of 10 ingredients and a cost cap, a slot search's Brave queries alternate "cheap easy few ingredient … recipe" and the plain query for each protein, and with neither set they are unchanged.
 
 ---
 
