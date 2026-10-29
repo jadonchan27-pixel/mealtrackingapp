@@ -66,12 +66,15 @@ export function FinalWeek({
   targets,
   weekLabel,
   budgetCents = null,
+  renderChange,
 }: {
   week: WeekView;
   targets: DailyTargets | null;
   weekLabel: string;
   // US-32: the profile's weekly budget, if set.
   budgetCents?: number | null;
+  // US-36: a way to change each dish, shown under it.
+  renderChange?: (item: PlanItemView) => React.ReactNode;
 }) {
   const totals = planDailyTotals(week.items);
   // US-33: newer weeks eat one dish for lunch and dinner.
@@ -135,6 +138,7 @@ export function FinalWeek({
                 </span>
               )}
             </p>
+            {renderChange?.(item)}
           </li>
         ))}
       </ul>

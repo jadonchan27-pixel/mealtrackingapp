@@ -16,6 +16,7 @@ const reset = await import("@/app/api/weeks/[week]/reset/route");
 const shopping = await import("@/app/api/weeks/[week]/shopping-list/route");
 const shoppingItem = await import("@/app/api/shopping-list/[id]/route");
 const customRecipe = await import("@/app/api/weeks/[week]/custom-recipe/route");
+const change = await import("@/app/api/weeks/[week]/change/route");
 
 function signedIn(seed: Parameters<typeof fakeRecipeTables>[0] = {}) {
   const db = fakeRecipeTables(seed);
@@ -426,5 +427,44 @@ describe("POST /api/weeks/:id/custom-recipe", () => {
     expect(saved.candidates.breakfast).toMatchObject([
       { selected: true, recipe: { title: "Overnight oats", kcal: 420 } },
     ]);
+  });
+});
+
+describe("POST /api/weeks/:id/change", () => {
+  it("needs a candidate and a saved profile", async () => {
+    signedIn();
+    const bad = await change.POST(
+      request("POST", { candidateId: "2" }),
+      params({ week: "1" }),
+    );
+    expect(bad.status).toBe(400);
+    const noProfile = await change.POST(
+      request("POST", { candidateId: 2 }),
+      params({ week: "1" }),
+    );
+    expect(noProfile.status).toBe(409);
+  });
+
+  it("refuses a draft week", async () => {
+    signedIn({
+      seed: {
+        week_plans: [{ id: 1, week_start: "2026-11-01", status: "draft" }],
+        profile: [
+          {
+            age: 25,
+            sex: "male",
+            height_in: 70,
+            weight_lb: 160,
+            activity_level: "light",
+            surplus_kcal: 300,
+          },
+        ],
+      },
+    });
+    const res = await change.POST(
+      request("POST", { candidateId: 2 }),
+      params({ week: "1" }),
+    );
+    expect(res.status).toBe(409);
   });
 });

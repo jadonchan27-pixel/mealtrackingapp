@@ -8,6 +8,7 @@ import type { FoodLookup } from "@/lib/foods";
 import { nutritionForRecipe } from "@/lib/nutrition";
 import { PlanError, loadWeekById, type WeekView } from "@/lib/plans";
 import { saveIngredients } from "@/lib/recipes";
+import { customSource } from "@/lib/recipeSource";
 import { isMealSlot, PLAN_SLOTS } from "@/lib/weeks";
 
 export const CUSTOM_LIMITS = {
@@ -39,13 +40,6 @@ export type CustomRecipeInput = {
 export type CustomRecipeParse =
   | { ok: true; value: CustomRecipeInput }
   | { ok: false; errors: Partial<Record<keyof CustomRecipeInput, string>> };
-
-const CUSTOM_PREFIX = "custom:";
-
-// A recipe Jadon entered himself has no page of its own to link to.
-export function isCustomSource(sourceUrl: string): boolean {
-  return sourceUrl.startsWith(CUSTOM_PREFIX);
-}
 
 function numberIn(
   value: unknown,
@@ -135,7 +129,10 @@ export function parseCustomRecipe(body: unknown): CustomRecipeParse {
   }
   let costCentsPerServing: number | null = null;
   if (!blank(b.costPerServing)) {
-    const v = numberIn(b.costPerServing, L.cost);
+    const v = numberIn(
+      String(b.costPerServing).trim().replace(/^\$/, ""),
+      L.cost,
+    );
     if (v === null) {
       errors.costCentsPerServing = `Cost per serving must be from $${L.cost.min} to $${L.cost.max}.`;
     } else costCentsPerServing = Math.round(v * 100);
@@ -161,39 +158,39 @@ export function parseCustomRecipe(body: unknown): CustomRecipeParse {
   };
 }
 
-// Saves the recipe and makes it the slot's pick, first in rank. Its
-// ingredients are matched to foods for the shopping list, but the
-// nutrition stays as entered.
+// Saves the recipe and adds it to the slot's candidates, first in rank. On
+// a draft it becomes the pick; on a finalized week the caller changes the
+// dish to it (US-36, changeDish). Its ingredients are matched to foods for
+// the shopping list, but the nutrition stays as entered.
 export async function addCustomRecipe(
   supabase: SupabaseClient<Database>,
   weekId: number,
   input: CustomRecipeInput,
   lookup: FoodLookup,
   newId: () => string = () => crypto.randomUUID(),
-): Promise<WeekView> {
+): Promise<{ week: WeekView; candidateId: number }> {
   const week = await loadWeekById(supabase, weekId);
-  if (week.status !== "draft") {
-    throw new PlanError("This week's plan is already finalized", 409);
-  }
+  const draft = week.status === "draft";
 
-  // A link already saved as a web recipe keeps that recipe; this one is
-  // stored under its own key.
-  let sourceUrl = input.sourceUrl ?? `${CUSTOM_PREFIX}${newId()}`;
-  if (input.sourceUrl) {
-    const taken = await supabase
-      .from("recipes")
-      .select("id")
-      .eq("source_url", input.sourceUrl)
-      .maybeSingle();
-    if (taken.error) throw new PlanError(taken.error.message);
-    if (taken.data) sourceUrl = `${CUSTOM_PREFIX}${newId()}`;
-  }
+  const sourceUrl = customSource(newId(), input.sourceUrl);
 
-  const { items } = await nutritionForRecipe(
-    input.ingredients,
-    input.servings,
-    lookup,
-  );
+  // The nutrition is Jadon's, so a USDA outage only leaves the ingredients
+  // unmatched (off the shopping list) instead of losing the recipe.
+  let items: Awaited<ReturnType<typeof nutritionForRecipe>>["items"];
+  try {
+    ({ items } = await nutritionForRecipe(
+      input.ingredients,
+      input.servings,
+      lookup,
+    ));
+  } catch (err) {
+    console.error("Ingredient matching failed; saving them unmatched", err);
+    ({ items } = await nutritionForRecipe(
+      input.ingredients,
+      input.servings,
+      async () => null,
+    ));
+  }
   const saved = await supabase
     .from("recipes")
     .insert({
@@ -219,19 +216,28 @@ export async function addCustomRecipe(
     ]);
   }
 
-  const unpick = await supabase
+  if (draft) {
+    const unpick = await supabase
+      .from("plan_candidates")
+      .update({ selected: false })
+      .eq("week_plan_id", week.id)
+      .eq("slot", input.slot);
+    if (unpick.error) throw new PlanError(unpick.error.message);
+  }
+  const added = await supabase
     .from("plan_candidates")
-    .update({ selected: false })
-    .eq("week_plan_id", week.id)
-    .eq("slot", input.slot);
-  if (unpick.error) throw new PlanError(unpick.error.message);
-  const added = await supabase.from("plan_candidates").insert({
-    week_plan_id: week.id,
-    slot: input.slot,
-    recipe_id: recipe.id,
-    rank: 0,
-    selected: true,
-  });
+    .insert({
+      week_plan_id: week.id,
+      slot: input.slot,
+      recipe_id: recipe.id,
+      rank: 0,
+      selected: draft,
+    })
+    .select("id")
+    .single();
   if (added.error) throw new PlanError(added.error.message);
-  return loadWeekById(supabase, week.id);
+  return {
+    week: await loadWeekById(supabase, week.id),
+    candidateId: added.data.id,
+  };
 }

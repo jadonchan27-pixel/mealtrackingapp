@@ -35,6 +35,24 @@ export function isSharedWeek(week: {
   return !week.items.some((i) => i.slot === "dinner");
 }
 
+// TR-30: a dish changed after finalizing gets a new plan item and the old
+// one stays for the days it was eaten. A slot's current item is the one for
+// its picked recipe (the newest one if the picks no longer say).
+export function currentItems<
+  T extends { id: number; slot: MealSlot; recipe_id: number },
+>(
+  items: readonly T[],
+  picks: readonly { slot: MealSlot; recipe_id: number }[],
+): T[] {
+  return items.filter((item) => {
+    const mine = items.filter((i) => i.slot === item.slot);
+    const pick = picks.find((p) => p.slot === item.slot);
+    const picked = pick && mine.find((i) => i.recipe_id === pick.recipe_id);
+    const current = picked ?? mine.reduce((a, b) => (b.id > a.id ? b : a));
+    return current.id === item.id;
+  });
+}
+
 export const SLOT_LABELS: Record<MealSlot, string> = {
   breakfast: "Breakfast",
   lunch: "Lunch",

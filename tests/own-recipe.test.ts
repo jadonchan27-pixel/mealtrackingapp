@@ -6,6 +6,7 @@ import { describe, expect, it, vi } from "vitest";
 import { addCustomRecipe, parseCustomRecipe } from "@/lib/customRecipe";
 import type { FoodRow } from "@/lib/db/types";
 import { finalizeWeek } from "@/lib/plans";
+import { customSource, isCustomSource, recipeLink } from "@/lib/recipeSource";
 import { fakeRecipeTables } from "@/tests/helpers/fakeRecipeTables";
 
 function food(id: number, name: string): FoodRow {
@@ -154,12 +155,33 @@ describe("parseCustomRecipe", () => {
   });
 });
 
+describe("recipe sources", () => {
+  it("keeps an own recipe's link apart from web recipes", () => {
+    expect(customSource("a1", null)).toBe("custom:a1");
+    expect(customSource("a1", "https://mom.test/x")).toBe(
+      "custom:a1|https://mom.test/x",
+    );
+    expect(isCustomSource("custom:a1")).toBe(true);
+    expect(isCustomSource("https://x.test/1")).toBe(false);
+    expect(recipeLink("custom:a1")).toBeNull();
+    expect(recipeLink("custom:a1|https://mom.test/x")).toBe(
+      "https://mom.test/x",
+    );
+    expect(recipeLink("https://x.test/1")).toBe("https://x.test/1");
+  });
+
+  it("reads a cost typed with a dollar sign", () => {
+    const parsed = parseCustomRecipe({ ...BODY, costPerServing: "$3" });
+    expect(parsed.ok && parsed.value.costCentsPerServing).toBe(300);
+  });
+});
+
 describe("addCustomRecipe", () => {
   it("makes the recipe the slot's pick with the entered nutrition", async () => {
     const db = draftWeek();
     const parsed = parseCustomRecipe(BODY);
     if (!parsed.ok) throw new Error("bad body");
-    const week = await addCustomRecipe(
+    const { week } = await addCustomRecipe(
       db.client,
       1,
       parsed.value,
@@ -211,7 +233,7 @@ describe("addCustomRecipe", () => {
       sourceUrl: "https://x.test/2",
     });
     if (!parsed.ok) throw new Error("bad body");
-    const week = await addCustomRecipe(
+    const { week } = await addCustomRecipe(
       db.client,
       1,
       parsed.value,
@@ -219,18 +241,47 @@ describe("addCustomRecipe", () => {
       () => "xyz",
     );
     expect(week.candidates.lunch[0].recipe).toMatchObject({
-      sourceUrl: "custom:xyz",
+      sourceUrl: "custom:xyz|https://x.test/2",
       costCentsPerServing: 150,
     });
     expect(db.recipes().find((r) => r.id === 2)?.title).toBe("Recipe 2");
   });
 
-  it("can't be added to a finalized week yet", async () => {
+  it("saves the recipe with unmatched ingredients when USDA fails", async () => {
+    const db = draftWeek();
+    const parsed = parseCustomRecipe(BODY);
+    if (!parsed.ok) throw new Error("bad body");
+    const failing = vi.fn(async () => {
+      throw new Error("USDA request failed: 503");
+    });
+    const { week } = await addCustomRecipe(db.client, 1, parsed.value, failing);
+    expect(week.candidates.lunch[0].recipe).toMatchObject({
+      title: "Mom's chicken and rice",
+      kcal: 650,
+    });
+    const saved = db
+      .recipes()
+      .find((r) => r.title === "Mom's chicken and rice")!;
+    expect(
+      db
+        .table("recipe_ingredients")
+        .filter((l) => l.recipe_id === saved.id)
+        .map((l) => l.food_id),
+    ).toEqual([null, null, null]);
+  });
+
+  it("is added unpicked to a finalized week, for changeDish", async () => {
     const db = draftWeek("final");
     const parsed = parseCustomRecipe(BODY);
     if (!parsed.ok) throw new Error("bad body");
-    await expect(
-      addCustomRecipe(db.client, 1, parsed.value, lookup),
-    ).rejects.toMatchObject({ status: 409 });
+    const { week, candidateId } = await addCustomRecipe(
+      db.client,
+      1,
+      parsed.value,
+      lookup,
+    );
+    const added = week.candidates.lunch.find((c) => c.id === candidateId)!;
+    expect(added).toMatchObject({ rank: 0, selected: false });
+    expect(week.candidates.lunch.find((c) => c.selected)?.recipe.id).toBe(2);
   });
 });

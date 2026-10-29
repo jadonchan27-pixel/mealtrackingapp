@@ -278,6 +278,47 @@ describe("searchSlot and selectCandidate", () => {
     expect(again.pagesRead).toBe(4);
   });
 
+  // Step 20h: "Search again" keeps Jadon's own recipes (US-35).
+  it("keeps own recipes on the shortlist when searching again", async () => {
+    const db = fakeRecipeTables();
+    const { brave, readPage, lookup, wait } = fakes();
+    const week = await startWeek(db.client, {
+      weekStart: "2026-11-01",
+      cuisines: ["Indian"],
+    });
+    db.table("recipes").push({
+      id: 500,
+      title: "Mom's dal",
+      source_url: "custom:abc",
+      servings: 4,
+      kcal: 500,
+      protein_g: 30,
+      carbs_g: 60,
+      fat_g: 10,
+    });
+    db.table("plan_candidates").push({
+      id: 500,
+      week_plan_id: week.id,
+      slot: "lunch",
+      recipe_id: 500,
+      rank: 0,
+      selected: true,
+    });
+    const result = await searchSlot({
+      supabase: db.client,
+      weekId: week.id,
+      slot: "lunch",
+      brave,
+      lookup,
+      readPage,
+      wait,
+    });
+    const own = result.candidates.find((c) => c.recipe.id === 500);
+    expect(own).toMatchObject({ rank: 0, selected: false });
+    expect(result.candidates.filter((c) => c.selected)).toHaveLength(1);
+    expect(result.candidates.length).toBeGreaterThan(1);
+  });
+
   it("refuses to change a finalized week or an unknown candidate", async () => {
     const db = fakeRecipeTables({
       seed: {
