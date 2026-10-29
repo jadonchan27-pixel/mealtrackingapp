@@ -815,3 +815,9 @@ button:disabled {
 .budget p {
   margin: 4px 0 0;
 }
+
+/* US-8: reveals the rest of a slot's candidates. */
+.show-all {
+  min-height: 44px;
+  margin-top: 8px;
+}

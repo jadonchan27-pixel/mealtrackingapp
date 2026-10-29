@@ -14,6 +14,9 @@ import {
   SLOT_LABELS,
 } from "@/lib/weeks";
 
+// Candidates shown per slot before "Show all" (US-8).
+export const SHORTLIST_SHOWN = 3;
+
 // "Sunday, Nov 1"
 export function weekLabel(weekStart: string): string {
   return new Date(`${weekStart}T00:00:00Z`).toLocaleDateString("en-US", {
@@ -490,6 +493,12 @@ function SlotSection({
 }) {
   const [pickError, setPickError] = useState<string | null>(null);
   const [picking, setPicking] = useState<number | null>(null);
+  // US-8: the top 3 (and the pick) up front, the rest on request.
+  const [showAll, setShowAll] = useState(false);
+  const shown = showAll
+    ? candidates
+    : candidates.filter((c, i) => i < SHORTLIST_SHOWN || c.selected);
+  const hidden = candidates.length - shown.length;
 
   async function pick(id: number) {
     setPicking(id);
@@ -544,7 +553,7 @@ function SlotSection({
       )}
       {candidates.length > 0 && (
         <ul className="candidates">
-          {candidates.map((c) => (
+          {shown.map((c) => (
             <li
               key={c.id}
               className="card candidate"
@@ -587,6 +596,15 @@ function SlotSection({
             </li>
           ))}
         </ul>
+      )}
+      {(hidden > 0 || showAll) && candidates.length > SHORTLIST_SHOWN && (
+        <button
+          type="button"
+          className="show-all"
+          onClick={() => setShowAll((v) => !v)}
+        >
+          {showAll ? "Show the top 3" : `Show all ${candidates.length} options`}
+        </button>
       )}
     </section>
   );
