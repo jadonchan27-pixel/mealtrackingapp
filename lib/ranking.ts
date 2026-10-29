@@ -24,7 +24,8 @@ export type RankedRecipe<R extends RankableRecipe = RankableRecipe> = {
 export const MAX_ACTIVE_MINUTES = 60;
 
 // How much each part counts. Every part is scored 0 to 1, so scores run 0 to 1.
-export const WEIGHTS = { cuisine: 0.4, protein: 0.35, cost: 0.25 };
+// US-33: cost weighs most.
+export const WEIGHTS = { cuisine: 0.3, protein: 0.3, cost: 0.4 };
 
 // A recipe can be a candidate when its active time is known and within the
 // limit, it has nutrition, and it wasn't used last week.

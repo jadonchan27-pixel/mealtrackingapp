@@ -45,19 +45,18 @@ function week() {
         { id: 4, recipe_id: 2, food_id: 4, grams: 425 },
         { id: 5, recipe_id: 2, food_id: 5, grams: null },
         { id: 6, recipe_id: 3, food_id: 6, grams: 900 },
-        { id: 7, recipe_id: 3, food_id: 2, grams: 104 },
+        { id: 7, recipe_id: 2, food_id: 2, grams: 104 },
         { id: 8, recipe_id: 4, food_id: 7, grams: 600 },
       ],
-      plan_candidates: ["breakfast", "lunch", "dinner", "snack"].map(
-        (slot, i) => ({
-          id: i + 1,
-          week_plan_id: 1,
-          slot,
-          recipe_id: i + 1,
-          rank: 1,
-          selected: true,
-        }),
-      ),
+      // US-33: breakfast and the lunch-and-dinner dish.
+      plan_candidates: ["breakfast", "lunch"].map((slot, i) => ({
+        id: i + 1,
+        week_plan_id: 1,
+        slot,
+        recipe_id: i + 1,
+        rank: 1,
+        selected: true,
+      })),
     },
   });
 }
@@ -80,7 +79,7 @@ describe("shopping list for a finalized plan", () => {
       "spices_staples",
     ]);
     const items = list.sections.flatMap((s) => s.items);
-    expect(items).toHaveLength(7);
+    expect(items).toHaveLength(5);
     for (const item of items) {
       expect(item.packages).toBeGreaterThanOrEqual(1);
       expect(item.priceCents).toBeGreaterThan(0);
@@ -89,13 +88,13 @@ describe("shopping list for a finalized plan", () => {
     }
     expect(list.totalCents).toBe(items.reduce((t, i) => t + i.priceCents, 0));
 
-    // Tortillas from breakfast and dinner are one line: servings per day ×
+    // Tortillas from breakfast and the shared dish are one line: servings per day ×
     // 7 ÷ 4 of each recipe's tortillas, in 30-count (780 g) packs.
     const servings = Object.fromEntries(
       final.items.map((i) => [i.recipe.id, i.servingsPerDay]),
     );
     const tortillaGrams =
-      (208 * servings[1] * 7) / 4 + (104 * servings[3] * 7) / 4;
+      (208 * servings[1] * 7) / 4 + (104 * servings[2] * 7) / 4;
     const tortillas = items.find((i) => i.name.startsWith("Corn tortillas"))!;
     expect(tortillas.neededGrams).toBe(Math.round(tortillaGrams));
     expect(tortillas.packages).toBe(Math.ceil(tortillaGrams / 780 - 0.01));
@@ -116,12 +115,12 @@ describe("shopping list for a finalized plan", () => {
     });
     expect(db.table("shopping_list_items")).toHaveLength(0);
     const list = await shoppingListForWeek(db.client, final);
-    expect(list.sections.flatMap((s) => s.items)).toHaveLength(7);
-    expect(db.table("shopping_list_items")).toHaveLength(7);
+    expect(list.sections.flatMap((s) => s.items)).toHaveLength(5);
+    expect(db.table("shopping_list_items")).toHaveLength(5);
 
     // Writing again replaces the list instead of adding to it.
     await writeShoppingList(db.client, 1);
-    expect(db.table("shopping_list_items")).toHaveLength(7);
+    expect(db.table("shopping_list_items")).toHaveLength(5);
   });
 
   it("is empty for a draft", async () => {

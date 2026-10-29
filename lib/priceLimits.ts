@@ -13,9 +13,10 @@ export function formatPrice(cents: number): string {
   return `$${(cents / 100).toFixed(2)}`;
 }
 
-// Servings a recipe would be eaten at in a slot: the meals share 80% of the
-// day's calories evenly; the snack is 1 or 2 servings, whichever is nearer
-// its 20%. Unknown calories count as 1 serving.
+// Servings a recipe would be eaten at in one meal: the day's three meals
+// share its calories evenly (US-33: breakfast, and the lunch-and-dinner dish
+// twice). A snack, in older weeks, is 1 or 2 servings, whichever is nearer
+// 20%. Unknown calories count as 1 serving.
 export function mealServings(
   slot: MealSlot,
   kcalPerServing: number | null,
@@ -26,7 +27,7 @@ export function mealServings(
     const share = (dailyKcal * (1 - MEAL_SHARE)) / kcalPerServing;
     return Math.abs(share - 1) <= Math.abs(share - 2) ? 1 : 2;
   }
-  const servings = (dailyKcal * MEAL_SHARE) / MEALS_PER_DAY / kcalPerServing;
+  const servings = dailyKcal / MEALS_PER_DAY / kcalPerServing;
   return Math.max(
     SERVING_STEP,
     Math.round(servings / SERVING_STEP) * SERVING_STEP,

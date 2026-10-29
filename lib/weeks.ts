@@ -10,6 +10,31 @@ export const MEAL_SLOTS: readonly MealSlot[] = [
   "snack",
 ];
 
+// US-33: the slots a new week plans. `lunch` holds the one dish eaten for
+// both lunch and dinner; there's no snack. Weeks planned before keep all
+// four slots.
+export const PLAN_SLOTS: readonly MealSlot[] = ["breakfast", "lunch"];
+export const SHARED_SLOT: MealSlot = "lunch";
+export const SHARED_LABEL = "Lunch & dinner";
+
+// Meals a plan slot's dish covers each day.
+export function mealsPerDay(slot: MealSlot, shared: boolean): number {
+  return shared && slot === SHARED_SLOT ? 2 : 1;
+}
+
+// A plan slot's label: the lunch slot reads "Lunch & dinner" in a week
+// planned with a shared dish (one with no separate dinner).
+export function planSlotLabel(slot: MealSlot, shared: boolean): string {
+  return shared && slot === SHARED_SLOT ? SHARED_LABEL : SLOT_LABELS[slot];
+}
+
+// A week shares its lunch dish with dinner unless it planned a dinner.
+export function isSharedWeek(week: {
+  items: readonly { slot: MealSlot }[];
+}): boolean {
+  return !week.items.some((i) => i.slot === "dinner");
+}
+
 export const SLOT_LABELS: Record<MealSlot, string> = {
   breakfast: "Breakfast",
   lunch: "Lunch",

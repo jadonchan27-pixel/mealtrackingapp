@@ -3,7 +3,7 @@ import { WeekBudget } from "@/components/Budget";
 import { RecipePhoto } from "@/components/RecipeFacts";
 import type { PlanItemView, WeekView } from "@/lib/plans";
 import { dailyTotals } from "@/lib/scaling";
-import { SLOT_LABELS } from "@/lib/weeks";
+import { isSharedWeek, planSlotLabel } from "@/lib/weeks";
 
 export type DailyTargets = {
   kcal: number;
@@ -63,6 +63,8 @@ export function FinalWeek({
   budgetCents?: number | null;
 }) {
   const totals = planDailyTotals(week.items);
+  // US-33: newer weeks eat one dish for lunch and dinner.
+  const shared = isSharedWeek(week);
   const rows: [string, keyof DailyTargets, string][] = [
     ["Calories", "kcal", "kcal"],
     ["Protein", "proteinG", "g"],
@@ -99,7 +101,7 @@ export function FinalWeek({
               title={item.recipe.title}
               className="candidate-photo"
             />
-            <p className="slot-label">{SLOT_LABELS[item.slot]}</p>
+            <p className="slot-label">{planSlotLabel(item.slot, shared)}</p>
             <h3>
               <Link href={`/recipes/${item.recipe.id}`}>
                 {item.recipe.title}

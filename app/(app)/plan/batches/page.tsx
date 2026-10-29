@@ -8,7 +8,8 @@ import { loadWeek } from "@/lib/plans";
 import {
   austinToday,
   currentWeekStart,
-  SLOT_LABELS,
+  isSharedWeek,
+  planSlotLabel,
   upcomingWeekStart,
 } from "@/lib/weeks";
 
@@ -81,6 +82,7 @@ async function UpcomingBatches() {
 // US-12: one cooking session's recipes, scaled for the days it covers.
 function BatchSection({ batch }: { batch: Batch }) {
   const headingId = `batch-${batch.batch}`;
+  const shared = isSharedWeek({ items: batch.recipes });
   return (
     <section aria-labelledby={headingId} className="batch">
       <h2 id={headingId}>{batch.label}</h2>
@@ -95,7 +97,7 @@ function BatchSection({ batch }: { batch: Batch }) {
             className="batch-photo"
           />
           <div>
-            <p className="slot-label">{SLOT_LABELS[r.slot]}</p>
+            <p className="slot-label">{planSlotLabel(r.slot, shared)}</p>
             <h3>
               <Link href={`/recipes/${r.recipeId}`}>{r.title}</Link>
             </h3>

@@ -99,14 +99,15 @@ describe("rankRecipes", () => {
     });
 
     // Protein per 100 kcal: Italian 12, Lean 10, Unknown 8, Cheap 4.
-    // Lean:    0.4 × 1   + 0.35 × 0.75 + 0.25 × 0   = 0.6625
-    // Unknown: 0.4 × 0.5 + 0.35 × 0.5  + 0.25 × 0.5 = 0.5
-    // Cheap:   0.4 × 1   + 0.35 × 0    + 0.25 × 1   = 0.65
-    // Italian: 0.4 × 0   + 0.35 × 1    + 0.25 × 0.5 = 0.475
+    // Cost weighs most (US-33):
+    // Cheap:   0.3 × 1   + 0.3 × 0    + 0.4 × 1   = 0.7
+    // Lean:    0.3 × 1   + 0.3 × 0.75 + 0.4 × 0   = 0.525
+    // Italian: 0.3 × 0   + 0.3 × 1    + 0.4 × 0.5 = 0.5
+    // Unknown: 0.3 × 0.5 + 0.3 × 0.5  + 0.4 × 0.5 = 0.5 (ties keep order)
     expect(ranked.map((r) => [r.recipe.title, r.score])).toEqual([
-      ["Lean", 0.663],
-      ["Cheap", 0.65],
-      ["Unknown", 0.5],
+      ["Cheap", 0.7],
+      ["Lean", 0.525],
+      ["Italian", 0.5],
     ]);
   });
 

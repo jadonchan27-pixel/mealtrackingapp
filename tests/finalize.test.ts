@@ -69,11 +69,10 @@ function draftWeek(picks: [string, number][]) {
   });
 }
 
+// US-33: breakfast, and one dish eaten for lunch and dinner.
 const ALL_PICKED: [string, number][] = [
   ["breakfast", 1],
   ["lunch", 2],
-  ["dinner", 3],
-  ["snack", 4],
 ];
 
 describe("weekDates", () => {
@@ -102,7 +101,7 @@ describe("finalizeWeek", () => {
     }
   });
 
-  it("writes a plan item per slot and a planned log entry per day and slot", async () => {
+  it("writes a plan item per dish and a planned log entry per day and meal", async () => {
     const db = draftWeek(ALL_PICKED);
     const week = await finalizeWeek(db.client, 1, {
       kcal: 2900,
@@ -113,25 +112,36 @@ describe("finalizeWeek", () => {
     expect(week.items.map((i) => [i.slot, i.recipe.id])).toEqual([
       ["breakfast", 1],
       ["lunch", 2],
-      ["dinner", 3],
-      ["snack", 4],
     ]);
     const items = db.table("plan_items");
-    expect(items).toHaveLength(4);
+    expect(items).toHaveLength(2);
 
     const entries = db.table("log_entries");
-    expect(entries).toHaveLength(28);
+    expect(entries).toHaveLength(21);
     expect(new Set(entries.map((e) => e.date))).toEqual(
       new Set(weekDates("2026-11-01")),
     );
-    for (const e of entries) {
-      const item = items.find((i) => i.id === e.plan_item_id)!;
-      expect(e).toMatchObject({
-        kind: "planned",
-        status: "planned",
-        slot: item.slot,
-        portion: item.servings_per_day,
-      });
+    const [breakfast, shared] = items;
+    for (const date of weekDates("2026-11-01")) {
+      const day = entries.filter((e) => e.date === date);
+      expect(day.map((e) => e.slot).sort()).toEqual([
+        "breakfast",
+        "dinner",
+        "lunch",
+      ]);
+      for (const e of day) {
+        const item = e.slot === "breakfast" ? breakfast : shared;
+        expect(e).toMatchObject({
+          kind: "planned",
+          status: "planned",
+          plan_item_id: item.id,
+          // The shared dish's servings split between lunch and dinner.
+          portion:
+            e.slot === "breakfast"
+              ? item.servings_per_day
+              : (item.servings_per_day as number) / 2,
+        });
+      }
     }
     expect(db.table("week_plans")[0].status).toBe("final");
 
@@ -143,12 +153,12 @@ describe("finalizeWeek", () => {
   });
 
   it("needs a pick for every slot", async () => {
-    const db = draftWeek(ALL_PICKED.slice(0, 3));
+    const db = draftWeek(ALL_PICKED.slice(0, 1));
     await expect(
       finalizeWeek(db.client, 1, { kcal: 2900, proteinG: 150 }),
     ).rejects.toMatchObject({
       status: 409,
-      message: "Pick a recipe for snack first",
+      message: "Pick a recipe for lunch first",
     });
     expect(db.table("plan_items")).toHaveLength(0);
   });
@@ -159,7 +169,7 @@ describe("finalizeWeek", () => {
     await expect(
       finalizeWeek(db.client, 1, { kcal: 2900, proteinG: 150 }),
     ).rejects.toMatchObject({ status: 409 });
-    expect(db.table("log_entries")).toHaveLength(28);
+    expect(db.table("log_entries")).toHaveLength(21);
   });
 });
 
@@ -168,8 +178,8 @@ describe("batchesForWeek", () => {
   it("scales every recipe to servings per day × 4 and × 3", async () => {
     const db = draftWeek(ALL_PICKED);
     db.table("recipe_ingredients").push(
-      { id: 1, recipe_id: 3, raw_text: "2 lb ground beef", grams: 907 },
-      { id: 2, recipe_id: 3, raw_text: "1 cup rice", grams: 185 },
+      { id: 1, recipe_id: 2, raw_text: "2 lb chicken thighs", grams: 907 },
+      { id: 2, recipe_id: 2, raw_text: "1 cup rice", grams: 185 },
     );
     const week = await finalizeWeek(db.client, 1, {
       kcal: 2900,
@@ -181,19 +191,14 @@ describe("batchesForWeek", () => {
       [sunday, 4],
       [thursday, 3],
     ] as const) {
-      expect(batch.recipes.map((r) => r.slot)).toEqual([
-        "breakfast",
-        "lunch",
-        "dinner",
-        "snack",
-      ]);
+      expect(batch.recipes.map((r) => r.slot)).toEqual(["breakfast", "lunch"]);
       for (const r of batch.recipes) {
         const item = week.items.find((i) => i.slot === r.slot)!;
         expect(r.servings).toBe(item.servingsPerDay * days);
         expect(r.factor).toBe((item.servingsPerDay * days) / 4);
       }
-      const dinner = batch.recipes.find((r) => r.slot === "dinner")!;
-      expect(dinner.ingredients[0].grams).toBe(Math.round(907 * dinner.factor));
+      const shared = batch.recipes.find((r) => r.slot === "lunch")!;
+      expect(shared.ingredients[0].grams).toBe(Math.round(907 * shared.factor));
     }
   });
 

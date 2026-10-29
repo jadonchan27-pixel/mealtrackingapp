@@ -1,7 +1,9 @@
 // Portion scaling (TR-12, US-11): how many servings of each picked recipe to
 // eat per day so the day lands near the calorie and protein targets.
-// Breakfast, lunch and dinner share ~80% of the calories evenly; the snack
-// takes ~20% as 1 or 2 servings. Servings are in quarters.
+// The meals share the calories evenly, a dish eaten for two meals (US-33's
+// lunch-and-dinner dish) counting twice; in older weeks with a snack, the
+// meals share ~80% and the snack takes ~20% as 1 or 2 servings. Servings are
+// in quarters per meal.
 
 import type { MealSlot } from "@/lib/db/types";
 
@@ -13,6 +15,8 @@ export type ScalableRecipe = {
   proteinG: number;
   carbsG: number;
   fatG: number;
+  // US-33: meals a day this recipe covers (2 for the lunch-and-dinner dish).
+  meals?: number;
 };
 
 export type ScaledItem = ScalableRecipe & { servingsPerDay: number };
@@ -66,6 +70,7 @@ export function scalePortions(
   const meals = recipes.filter((r) => MEAL_SLOTS.includes(r.slot));
   const snacks = recipes.filter((r) => !MEAL_SLOTS.includes(r.slot));
 
+  const mealCount = meals.reduce((n, r) => n + (r.meals ?? 1), 0);
   const snackShare =
     meals.length === 0 ? 1 : snacks.length === 0 ? 0 : 1 - MEAL_SHARE;
   const perSnack = (targets.kcal * snackShare) / Math.max(snacks.length, 1);
@@ -77,7 +82,7 @@ export function scalePortions(
 
   // Each meal's exact share, then the quarter below or above it.
   const perMeal =
-    Math.max(0, targets.kcal - snackKcal) / Math.max(meals.length, 1);
+    Math.max(0, targets.kcal - snackKcal) / Math.max(mealCount, 1);
   const options = meals.map((r) => {
     const exact = perMeal / r.kcal;
     const down = Math.max(
@@ -102,12 +107,17 @@ export function scalePortions(
       return;
     }
     for (const s of options[i])
-      choose(i + 1, [...picked, s], kcal + s * meals[i].kcal);
+      choose(
+        i + 1,
+        [...picked, s],
+        kcal + s * meals[i].kcal * (meals[i].meals ?? 1),
+      );
   };
   choose(0, [], 0);
+  // Servings per day cover every meal the recipe is eaten at.
   const scaledMeals = meals.map((r, i) => ({
     ...r,
-    servingsPerDay: quarters(best[i]),
+    servingsPerDay: quarters(best[i]) * (r.meals ?? 1),
   }));
 
   const items = [...scaledMeals, ...scaledSnacks];
@@ -119,8 +129,9 @@ export function scalePortions(
     for (let extra = 0; extra < MAX_PROTEIN_TOP_UP; extra += SERVING_STEP) {
       const totals = dailyTotals(items);
       if (totals.proteinG >= targets.proteinG) break;
-      if (totals.kcal + proteinPick.kcal * SERVING_STEP > maxKcal) break;
-      proteinPick.servingsPerDay += SERVING_STEP;
+      const step = SERVING_STEP * (proteinPick.meals ?? 1);
+      if (totals.kcal + proteinPick.kcal * step > maxKcal) break;
+      proteinPick.servingsPerDay += step;
     }
   }
 

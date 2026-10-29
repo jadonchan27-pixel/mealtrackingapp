@@ -160,13 +160,13 @@ describe("findTopRecipes", () => {
     // Per serving (protein per 100 kcal, cost):
     //   Tandoori 430 kcal, 13.7 g, $2.70   Dal    362 kcal, 5.7 g, $0.80
     //   Paneer   610 kcal,  5.4 g, $2.45   Pasta  360 kcal, 18.8 g, $3.00
-    // Scores: Dal 0.4 + 0.35 × 0.03 + 0.25 × 1 = 0.659; Tandoori 0.4 +
-    // 0.35 × 0.62 + 0.25 × 0.14 = 0.653; Paneer 0.4 + 0 + 0.25 × 0.25 =
-    // 0.463; Italian pasta 0 + 0.35 + 0 = 0.35. Biryani is over an hour.
+    // Scores: Dal 0.3 + 0.3 × 0.03 + 0.4 × 1 = 0.708; Tandoori 0.3 +
+    // 0.3 × 0.62 + 0.4 × 0.14 = 0.542; Paneer 0.3 + 0 + 0.4 × 0.25 =
+    // 0.4; Italian pasta 0 + 0.3 + 0 = 0.3. Biryani is over an hour.
     expect(result.top.map((r) => [r.recipe.title, r.score])).toEqual([
-      ["Dal", 0.659],
-      ["Tandoori chicken and rice", 0.653],
-      ["Paneer rice bowl", 0.463],
+      ["Dal", 0.708],
+      ["Tandoori chicken and rice", 0.542],
+      ["Paneer rice bowl", 0.4],
     ]);
     expect(result.top[1].recipe).toMatchObject({
       kcal: 430,
@@ -378,14 +378,15 @@ describe("searchQuery", () => {
     expect(searchQuery("breakfast", "Mexican", "egg")).toBe(
       "Mexican egg breakfast recipe",
     );
-    expect(searchQuery("lunch")).toBe("lunch recipe");
+    // US-33: lunch is the lunch-and-dinner dish, so it searches dinners.
+    expect(searchQuery("lunch")).toBe("dinner recipe");
   });
 
   it("searches each of the week's proteins, with or without a cuisine", () => {
     expect(searchQueries("lunch")).toEqual([
-      "chicken lunch recipe",
-      "lentil lunch recipe",
-      "tuna lunch recipe",
+      "chicken dinner recipe",
+      "lentil dinner recipe",
+      "black bean dinner recipe",
     ]);
     expect(searchQueries("dinner", ["Thai"], "2026-11-01")).toEqual(
       weekProteins("dinner", "2026-11-01").map(

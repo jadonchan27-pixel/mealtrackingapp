@@ -3,9 +3,13 @@ import {
   CUISINE_OPTIONS,
   currentWeekStart,
   isMealSlot,
+  isSharedWeek,
   isSunday,
+  mealsPerDay,
   parseNewWeek,
   pickCuisine,
+  PLAN_SLOTS,
+  planSlotLabel,
   upcomingWeekStart,
 } from "./weeks";
 
@@ -98,5 +102,37 @@ describe("pickCuisine", () => {
   it("uses the random number to choose", () => {
     expect(pickCuisine([], () => 0)).toBe(CUISINE_OPTIONS[0]);
     expect(pickCuisine([], () => 0.999)).toBe(CUISINE_OPTIONS.at(-1));
+  });
+});
+
+// US-33: breakfast, and one dish for lunch and dinner.
+describe("two dishes a week", () => {
+  it("plans breakfast and the shared lunch-and-dinner dish", () => {
+    expect(PLAN_SLOTS).toEqual(["breakfast", "lunch"]);
+    expect(mealsPerDay("lunch", true)).toBe(2);
+    expect(mealsPerDay("breakfast", true)).toBe(1);
+    expect(mealsPerDay("lunch", false)).toBe(1);
+  });
+
+  it("labels the shared dish only in a two-dish week", () => {
+    expect(planSlotLabel("lunch", true)).toBe("Lunch & dinner");
+    expect(planSlotLabel("breakfast", true)).toBe("Breakfast");
+    expect(planSlotLabel("lunch", false)).toBe("Lunch");
+  });
+
+  it("tells a two-dish week from an older four-meal week", () => {
+    expect(
+      isSharedWeek({ items: [{ slot: "breakfast" }, { slot: "lunch" }] }),
+    ).toBe(true);
+    expect(
+      isSharedWeek({
+        items: [
+          { slot: "breakfast" },
+          { slot: "lunch" },
+          { slot: "dinner" },
+          { slot: "snack" },
+        ],
+      }),
+    ).toBe(false);
   });
 });
