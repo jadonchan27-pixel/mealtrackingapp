@@ -74,7 +74,7 @@ describe("applyCostCap", () => {
     ]);
   });
 
-  it("keeps every fitting recipe but only fills up to `fill`", () => {
+  it("keeps every option with no limit, fitting ones first", () => {
     const ranked = [
       r(1, 800, 900),
       r(2, 800, 300),
@@ -82,10 +82,10 @@ describe("applyCostCap", () => {
       r(4, 800, 700),
       r(5, 800, 100),
     ];
-    // 2 fit; over-cap ones top up to 3.
+    // 2 fit; the rest follow, cheapest first (step 20e).
     expect(
-      applyCostCap(ranked, "dinner", cap, Infinity, 3).map((x) => x.id),
-    ).toEqual([2, 5, 3]);
+      applyCostCap(ranked, "dinner", cap, Infinity).map((x) => x.id),
+    ).toEqual([2, 5, 3, 4, 1]);
     const cheap = [
       r(1, 800, 100),
       r(2, 800, 200),
@@ -94,8 +94,8 @@ describe("applyCostCap", () => {
       r(5, 800, 900),
     ];
     expect(
-      applyCostCap(cheap, "dinner", cap, Infinity, 3).map((x) => x.id),
-    ).toEqual([1, 2, 3, 4]);
+      applyCostCap(cheap, "dinner", cap, Infinity).map((x) => x.id),
+    ).toEqual([1, 2, 3, 4, 5]);
   });
 
   it("caps the portion's cost, not one serving's", () => {
