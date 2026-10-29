@@ -13,6 +13,7 @@ import {
 } from "@/lib/ingredientCount";
 import { rankRecipes, type RankedRecipe } from "@/lib/ranking";
 import { saveRecipeFromUrl } from "@/lib/recipes";
+import { applyCostCap, type CostCap } from "@/lib/priceLimits";
 import { MAX_RESULTS, type BraveClient } from "@/lib/services/braveSearch";
 import type { RecipePage } from "@/lib/services/recipePage";
 
@@ -209,6 +210,7 @@ export async function findTopRecipes({
   ingredientRange,
   weekStart,
   now = Date.now,
+  costCap,
 }: {
   supabase: SupabaseClient<Database>;
   brave: Pick<BraveClient, "search">;
@@ -226,6 +228,8 @@ export async function findTopRecipes({
   // TR-24: picks the week's proteins.
   weekStart?: string;
   now?: () => number;
+  // TR-25: the most a meal may cost, and the day's calories to size it.
+  costCap?: CostCap;
 }): Promise<SlotSearchResult> {
   const started = now();
   const lists: string[][] = [];
@@ -314,8 +318,13 @@ export async function findTopRecipes({
     ...r,
     cost_cents_per_serving: costs.get(r.id) ?? null,
   }));
+  const ranked = rankRecipes(priced, {
+    cuisines,
+    excludedIds: excluded,
+    limit: costCap ? Infinity : limit,
+  });
   return {
-    top: rankRecipes(priced, { cuisines, excludedIds: excluded, limit }),
+    top: costCap ? applyCostCap(ranked, slot, costCap, limit) : ranked,
     recipes: priced,
     skipped,
   };
