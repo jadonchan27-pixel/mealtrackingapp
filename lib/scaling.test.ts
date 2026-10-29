@@ -107,4 +107,41 @@ describe("scalePortions", () => {
       scalePortions([recipe("lunch", 1, 0, 0)], { kcal: 2000, proteinG: 0 }),
     ).toThrow(/no calories/);
   });
+
+  // US-33: breakfast, and one dish eaten for lunch and dinner.
+  it("scales a dish eaten twice a day to two meals' worth", () => {
+    const targets = { kcal: 2700, proteinG: 120 };
+    const [breakfast, shared] = scalePortions(
+      [
+        recipe("breakfast", 1, 450, 25),
+        { ...recipe("lunch", 2, 600, 40), meals: 2 },
+      ],
+      targets,
+    );
+    const totals = dailyTotals([breakfast, shared]);
+    expect(Math.abs(totals.kcal - targets.kcal) / targets.kcal).toBeLessThan(
+      KCAL_TOLERANCE,
+    );
+    // Each of the three meals gets about 900 kcal: 2 servings of breakfast,
+    // 1.5 servings at lunch and again at dinner.
+    expect(breakfast.servingsPerDay).toBe(2);
+    expect(shared.servingsPerDay).toBe(3);
+    // Each meal's half is still a whole quarter serving.
+    expect((shared.servingsPerDay / 2) * 4).toBe(
+      Math.round((shared.servingsPerDay / 2) * 4),
+    );
+  });
+
+  it("tops up the shared dish's protein by at most half a serving a day", () => {
+    const recipes = [
+      recipe("breakfast", 1, 500, 5),
+      { ...recipe("lunch", 2, 100, 60), meals: 2 },
+    ];
+    const plain = scalePortions(
+      recipes.map((r) => ({ ...r, proteinG: 0 })),
+      { kcal: 3000, proteinG: 0 },
+    );
+    const topped = scalePortions(recipes, { kcal: 3000, proteinG: 4000 });
+    expect(topped[1].servingsPerDay - plain[1].servingsPerDay).toBe(0.5);
+  });
 });

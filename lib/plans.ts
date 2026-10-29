@@ -24,7 +24,14 @@ import type { RecipePage } from "@/lib/services/recipePage";
 import { ensureProducts } from "@/lib/products";
 import { scalePortions } from "@/lib/scaling";
 import { targetsForProfile } from "@/lib/targets";
-import { MEAL_SLOTS, pickCuisine, type NewWeekInput } from "@/lib/weeks";
+import {
+  MEAL_SLOTS,
+  mealsPerDay,
+  PLAN_SLOTS,
+  pickCuisine,
+  SHARED_SLOT,
+  type NewWeekInput,
+} from "@/lib/weeks";
 
 type Supabase = SupabaseClient<Database>;
 
@@ -520,9 +527,10 @@ export function weekDates(weekStart: string): string[] {
   });
 }
 
-// US-11, TR-12, TR-18: turns the week's picks into the plan. Each slot's
-// recipe gets its servings per day, and every day Sunday to Saturday gets a
-// planned log entry per slot. The week is then final.
+// US-11, TR-12, TR-18, US-33: turns the week's picks into the plan. Each
+// slot's recipe gets its servings per day, and every day Sunday to Saturday
+// gets a planned log entry per meal: breakfast, and the shared dish as lunch
+// and dinner with half its servings each. The week is then final.
 export async function finalizeWeek(
   supabase: Supabase,
   weekId: number,
@@ -538,7 +546,7 @@ export async function finalizeWeek(
       .eq("week_plan_id", week.id)
       .eq("selected", true),
   );
-  const unpicked = MEAL_SLOTS.filter((s) => !picks.some((p) => p.slot === s));
+  const unpicked = PLAN_SLOTS.filter((s) => !picks.some((p) => p.slot === s));
   if (unpicked.length > 0) {
     throw new PlanError(`Pick a recipe for ${unpicked.join(", ")} first`, 409);
   }
@@ -552,7 +560,7 @@ export async function finalizeWeek(
       ),
   );
   const scaled = scalePortions(
-    MEAL_SLOTS.map((slot) => {
+    PLAN_SLOTS.map((slot) => {
       const pick = picks.find((p) => p.slot === slot)!;
       const recipe = recipes.find((r) => r.id === pick.recipe_id);
       if (!recipe) throw new PlanError(`The ${slot} recipe is missing`, 409);
@@ -563,6 +571,7 @@ export async function finalizeWeek(
         proteinG: Number(recipe.protein_g ?? 0),
         carbsG: Number(recipe.carbs_g ?? 0),
         fatG: Number(recipe.fat_g ?? 0),
+        meals: mealsPerDay(slot, true),
       };
     }),
     targets,
@@ -608,16 +617,20 @@ export async function finalizeWeek(
       ).map((e) => `${e.date}|${e.slot}`),
     );
     const entries = weekDates(week.week_start).flatMap((date) =>
-      items.map((item) => ({
-        date,
-        slot: item.slot,
-        kind: "planned" as const,
-        plan_item_id: item.id,
-        portion: Number(item.servings_per_day),
-        ...(eatenOut.has(`${date}|${item.slot}`)
-          ? { status: "skipped" as const }
-          : {}),
-      })),
+      items.flatMap((item) => {
+        const slots: MealSlot[] =
+          item.slot === SHARED_SLOT ? [SHARED_SLOT, "dinner"] : [item.slot];
+        return slots.map((slot) => ({
+          date,
+          slot,
+          kind: "planned" as const,
+          plan_item_id: item.id,
+          portion: Number(item.servings_per_day) / slots.length,
+          ...(eatenOut.has(`${date}|${slot}`)
+            ? { status: "skipped" as const }
+            : {}),
+        }));
+      }),
     );
     check(await supabase.from("log_entries").insert(entries));
     check(

@@ -40,7 +40,7 @@ Phone / desktop browser (PWA)
 `lib/targets.ts`: convert lb and ft/in to kg and cm, compute Mifflin-St Jeor BMR, multiply by activity factor, add the surplus (300). Protein = 1 g × lb; fat = 25% of kcal ÷ 9; carbs = remainder ÷ 4. Computed on request, not stored.
 
 ### Recipe pipeline (TR-6 to TR-9, TR-11)
-For each slot (breakfast, lunch, dinner, snack):
+For each planned slot (breakfast, and `lunch`, which holds the lunch-and-dinner dish, US-33):
 1. Build a query, e.g. `"<cuisine> high protein <slot> recipe"`.
 2. Brave Search returns up to ~20 URLs; skip URLs already in `recipes`.
 3. Fetch each page and read its JSON-LD `Recipe`. Skip pages without one.
@@ -51,10 +51,10 @@ For each slot (breakfast, lunch, dinner, snack):
 8. Estimate cost per serving from `heb_products`.
 9. Store the recipe and ingredients. Unparseable lines are kept with `food_id = null` and shown to Jadon.
 
-Ranking score per candidate: cuisine match, protein per 100 kcal (higher is better), cost per serving (lower is better). Recipes used in the previous week are excluded (TR-13), and so are recipes whose ingredient count (pantry staples left out) is outside the profile's range (TR-22). Recipes whose meal cost (cost per serving × servings the slot needs) is over the profile's cap are excluded too, unless fewer than 3 fit, when the cheapest over-cap ones fill the gaps after them (TR-25). Each week searches 3 proteins per slot from a rotating list, a second Brave page only when the first is thin, and reads up to 40 pages per slot, starting none after 240 s (TR-24). Every recipe left per slot becomes a candidate, ranked best first, the best one pre-selected; the Plan page shows the top 3 and the rest behind "Show all".
+Ranking score per candidate: cuisine match (0.3), protein per 100 kcal (0.3, higher is better), cost per serving (0.4, lower is better). Recipes used in the previous week are excluded (TR-13), and so are recipes whose ingredient count (pantry staples left out) is outside the profile's range (TR-22). Recipes whose meal cost (cost per serving × servings the slot needs) is over the profile's cap are excluded too, unless fewer than 3 fit, when the cheapest over-cap ones fill the gaps after them (TR-25). Each week searches 3 proteins per slot from a rotating list, a second Brave page only when the first is thin, and reads up to 40 pages per slot, starting none after 240 s (TR-24). Every recipe left per slot becomes a candidate, ranked best first, the best one pre-selected; the Plan page shows the top 3 and the rest behind "Show all".
 
 ### Portion scaling (TR-12)
-Meals get ~80% of daily kcal (≈26.7% each), snacks ~20% as 1 or 2 servings. Each slot's servings per day = slot kcal ÷ recipe kcal per serving, rounded to the nearest 0.25. Then protein is checked; if it's short, the highest-protein recipe gets up to +0.5 serving within a 5% kcal tolerance.
+The day's kcal splits evenly over three meals (≈33.3% each); the lunch-and-dinner dish counts as two meals. Each meal's servings = meal kcal ÷ recipe kcal per serving, rounded to a quarter; the shared dish's servings per day are twice its meal servings, and finalize writes it a lunch and a dinner log entry with half each. (Weeks planned before US-33 keep their four slots.) Then protein is checked; if it's short, the highest-protein recipe gets up to +0.5 serving within a 5% kcal tolerance.
 
 ### Finalize and shopping list (TR-14 to TR-17)
 On finalize:

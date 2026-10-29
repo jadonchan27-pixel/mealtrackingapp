@@ -16,6 +16,7 @@ import { saveRecipeFromUrl } from "@/lib/recipes";
 import { applyCostCap, type CostCap } from "@/lib/priceLimits";
 import { MAX_RESULTS, type BraveClient } from "@/lib/services/braveSearch";
 import type { RecipePage } from "@/lib/services/recipePage";
+import { SHARED_SLOT } from "@/lib/weeks";
 
 // Protein foods to search for in each slot. "high protein" in the query
 // mostly finds roundup articles (1 usable recipe in 20 in the live check),
@@ -29,7 +30,17 @@ export const SLOT_PROTEINS: Record<MealSlot, readonly string[]> = {
     "turkey sausage",
     "tofu",
   ],
-  lunch: ["chicken", "lentil", "tuna", "turkey", "black bean", "shrimp"],
+  // US-33: the lunch-and-dinner dish; cheap proteins.
+  lunch: [
+    "chicken",
+    "lentil",
+    "black bean",
+    "pork",
+    "ground turkey",
+    "beef",
+    "tofu",
+    "chickpea",
+  ],
   dinner: ["chicken", "beef", "pork", "salmon", "shrimp", "tofu", "turkey"],
   snack: ["greek yogurt", "egg", "cottage cheese", "edamame"],
 };
@@ -60,7 +71,9 @@ export function searchQuery(
   cuisine?: string,
   protein?: string,
 ): string {
-  return [cuisine?.trim(), protein, slot, "recipe"].filter(Boolean).join(" ");
+  // The lunch-and-dinner dish searches as dinner, for a full meal.
+  const word = slot === SHARED_SLOT ? "dinner" : slot;
+  return [cuisine?.trim(), protein, word, "recipe"].filter(Boolean).join(" ");
 }
 
 // One search per cuisine (or one with none) and protein of the week.

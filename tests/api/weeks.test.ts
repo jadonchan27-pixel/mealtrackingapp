@@ -240,8 +240,13 @@ describe("POST /api/weeks/:id/finalize", () => {
     expect(res.status).toBe(200);
     const { week: finalized } = await res.json();
     expect(finalized.status).toBe("final");
-    expect(finalized.items).toHaveLength(4);
-    expect(db.table("log_entries")).toHaveLength(28);
+    // US-33: breakfast and the lunch-and-dinner dish; a dinner or snack
+    // pick left from before is ignored. 7 days × 3 meals.
+    expect(finalized.items.map((i: { slot: string }) => i.slot)).toEqual([
+      "breakfast",
+      "lunch",
+    ]);
+    expect(db.table("log_entries")).toHaveLength(21);
   });
 });
 

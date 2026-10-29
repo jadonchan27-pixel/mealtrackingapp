@@ -16,6 +16,8 @@ _Step 2 facet discussion. Builds on [02-profile-and-preferences.md](02-profile-a
 
 ## Meal structure
 
+> **Changed 2026-10-29 (US-33):** to cut cost, a week now has two dishes: breakfast, and one dish eaten for both lunch and dinner. There is no snack. The notes below describe the original plan.
+
 - Each day has breakfast, lunch, dinner and snacks.
 - Breakfast, lunch, dinner and snacks are all different recipes from each other.
 - The same set of recipes repeats every day of the week.

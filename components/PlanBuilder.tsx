@@ -10,8 +10,8 @@ import { costTag, type CostCap } from "@/lib/priceLimits";
 import {
   CUISINE_OPTIONS,
   MAX_CUISINES,
-  MEAL_SLOTS,
-  SLOT_LABELS,
+  PLAN_SLOTS,
+  planSlotLabel,
 } from "@/lib/weeks";
 
 // Recipes picked for the week's other meals, by recipe id.
@@ -20,7 +20,7 @@ export function pickedElsewhere(
   slot: MealSlot,
 ): Map<number, MealSlot> {
   const picks = new Map<number, MealSlot>();
-  for (const other of MEAL_SLOTS) {
+  for (const other of PLAN_SLOTS) {
     if (other === slot) continue;
     for (const c of week.candidates[other]) {
       if (c.selected) picks.set(c.recipe.id, other);
@@ -42,9 +42,9 @@ export function weekLabel(weekStart: string): string {
   });
 }
 
-// Picks across the four slots, e.g. 3 when one slot has no pick yet.
+// Picks across the plan's dishes (US-33: breakfast, and lunch & dinner).
 export function pickedCount(week: WeekView): number {
-  return MEAL_SLOTS.filter((s) => week.candidates[s].some((c) => c.selected))
+  return PLAN_SLOTS.filter((s) => week.candidates[s].some((c) => c.selected))
     .length;
 }
 
@@ -387,7 +387,7 @@ function Shortlist({
   async function searchEmptySlots() {
     setRunningAll(true);
     let current = week;
-    for (const slot of MEAL_SLOTS) {
+    for (const slot of PLAN_SLOTS) {
       if (current.candidates[slot].length === 0) {
         current = await search(slot, current);
       }
@@ -395,7 +395,7 @@ function Shortlist({
     setRunningAll(false);
   }
 
-  const empty = MEAL_SLOTS.filter((s) => week.candidates[s].length === 0);
+  const empty = PLAN_SLOTS.filter((s) => week.candidates[s].length === 0);
   const picked = pickedCount(week);
   const [finalizing, setFinalizing] = useState(false);
   const [finalizeError, setFinalizeError] = useState<string | null>(null);
@@ -433,7 +433,7 @@ function Shortlist({
           </button>
         </p>
         <p className="muted">
-          {picked} of {MEAL_SLOTS.length} meals picked.
+          {picked} of {PLAN_SLOTS.length} dishes picked.
           {empty.length > 0 &&
             " Each search reads up to 40 recipe pages and takes a minute or two."}
         </p>
@@ -446,12 +446,12 @@ function Shortlist({
           >
             {runningAll
               ? "Finding recipes…"
-              : empty.length === MEAL_SLOTS.length
-                ? "Find recipes for every meal"
-                : `Find recipes for the other ${empty.length === 1 ? "meal" : `${empty.length} meals`}`}
+              : empty.length === PLAN_SLOTS.length
+                ? "Find recipes for both dishes"
+                : "Find recipes for the other dish"}
           </button>
         )}
-        {picked === MEAL_SLOTS.length && (
+        {picked === PLAN_SLOTS.length && (
           <button
             type="button"
             className="primary"
@@ -473,7 +473,7 @@ function Shortlist({
         />
       </section>
 
-      {MEAL_SLOTS.map((slot) => (
+      {PLAN_SLOTS.map((slot) => (
         <SlotSection
           key={slot}
           slot={slot}
@@ -546,7 +546,7 @@ function SlotSection({
   return (
     <section className="slot" aria-labelledby={headingId}>
       <div className="slot-header">
-        <h2 id={headingId}>{SLOT_LABELS[slot]}</h2>
+        <h2 id={headingId}>{planSlotLabel(slot, true)}</h2>
         <button type="button" disabled={busy} onClick={onSearch}>
           {status.kind === "searching"
             ? "Searching…"
@@ -609,7 +609,8 @@ function SlotSection({
                 <p className="picked-badge">✓ Picked</p>
               ) : pickedElsewhere.has(c.recipe.id) ? (
                 <button type="button" disabled>
-                  Picked for {SLOT_LABELS[pickedElsewhere.get(c.recipe.id)!]}
+                  Picked for{" "}
+                  {planSlotLabel(pickedElsewhere.get(c.recipe.id)!, true)}
                 </button>
               ) : (
                 <button

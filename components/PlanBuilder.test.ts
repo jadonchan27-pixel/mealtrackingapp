@@ -14,7 +14,7 @@ describe("weekLabel", () => {
 });
 
 describe("pickedCount", () => {
-  it("counts slots with a pick", () => {
+  it("counts the plan's dishes with a pick", () => {
     const pick = (selected: boolean) =>
       ({ selected }) as WeekView["candidates"]["lunch"][number];
     const week = {
@@ -25,7 +25,8 @@ describe("pickedCount", () => {
         snack: [pick(true)],
       },
     } as unknown as WeekView;
-    expect(pickedCount(week)).toBe(2);
+    // US-33: only breakfast and the lunch-and-dinner dish count.
+    expect(pickedCount(week)).toBe(1);
   });
 });
 

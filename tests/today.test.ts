@@ -33,16 +33,15 @@ async function finalizedWeek() {
         recipe(3, "Beef Skillet", 690, 48),
         recipe(4, "Mango Yogurt Bowl", 260, 14),
       ],
-      plan_candidates: ["breakfast", "lunch", "dinner", "snack"].map(
-        (slot, i) => ({
-          id: i + 1,
-          week_plan_id: 1,
-          slot,
-          recipe_id: i + 1,
-          rank: 1,
-          selected: true,
-        }),
-      ),
+      // US-33: breakfast and the lunch-and-dinner dish.
+      plan_candidates: ["breakfast", "lunch"].map((slot, i) => ({
+        id: i + 1,
+        week_plan_id: 1,
+        slot,
+        recipe_id: i + 1,
+        rank: 1,
+        selected: true,
+      })),
     },
   });
   const week = await finalizeWeek(db.client, 1, {
@@ -60,10 +59,12 @@ describe("today's log", () => {
       "breakfast",
       "lunch",
       "dinner",
-      "snack",
     ]);
-    const lunch = day.entries[1];
-    const servings = week.items.find((i) => i.slot === "lunch")!.servingsPerDay;
+    const [, lunch, dinner] = day.entries;
+    // The shared dish's servings split between lunch and dinner.
+    const servings =
+      week.items.find((i) => i.slot === "lunch")!.servingsPerDay / 2;
+    expect(dinner).toMatchObject({ recipeId: 2, portion: servings });
     expect(lunch).toMatchObject({
       title: "Fiesta Chicken",
       recipeId: 2,

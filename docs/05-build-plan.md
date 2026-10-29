@@ -198,11 +198,19 @@ Status: ☐ not started · ◐ in progress · ☑ done and validated
 
 **Done when:** with a $4 cap, every shortlisted recipe's meal is at or under $4, unknown or marked over; with an $80 budget, the shopping list shows its total against $80.
 
-### ◐ Step 20c. All candidates (US-8)
+### ☑ Step 20c. All candidates (US-8)
 1. Slot search keeps every recipe left after the filters as a ranked candidate, not only the top 3. Over-cap fillers still only fill up to 3 places (TR-25).
 2. Plan page: each slot shows its top 3 (and the pick, if it's further down) with a "Show all N" button for the rest.
 
 **Done when:** a slot search that finds 8 eligible recipes stores 8 ranked candidates, and the Plan page can show and pick any of them.
+
+### ◐ Step 20d. Two dishes a week (US-33, TR-11, TR-12, TR-24)
+1. Plan slots become breakfast and a lunch-and-dinner dish (stored as `lunch`); no snack. The dish's searches say "dinner" and use a cheaper protein list.
+2. Portion scaling: three equal meals, the shared dish counting twice; finalize writes it lunch and dinner log entries with half the servings each.
+3. Ranking weighs cost most (0.4); meal cost for the cap uses a third of the day.
+4. Plan, batch cooking and the finalized week label the dish "Lunch & dinner". Weeks finalized before this keep their four meals.
+
+**Done when:** a new week finalizes with 2 plan items, and each day has breakfast, lunch and dinner log entries, lunch and dinner the same recipe at half its servings each.
 
 ---
 
