@@ -7,6 +7,7 @@ import type { FoodRow } from "@/lib/db/types";
 import {
   findTopRecipes,
   MAX_PAGES,
+  PAGE_DEADLINE_MS,
   mightBeRecipePage,
   previousWeekRecipeIds,
   previousWeekStart,
@@ -147,7 +148,7 @@ describe("findTopRecipes", () => {
       wait: noWait,
     });
 
-    // Each of the week's 3 proteins, 2 pages of results each.
+    // Each of the week's 3 proteins; page 1 has under 14 links, so page 2 too.
     expect(brave.search.mock.calls).toEqual([
       ["Indian chicken dinner recipe", 20, 0],
       ["Indian chicken dinner recipe", 20, 1],
@@ -239,9 +240,8 @@ describe("findTopRecipes", () => {
       wait,
     });
 
-    expect(
-      brave.search.mock.calls.filter((c) => c[2] === 0).map((c) => c[0]),
-    ).toEqual([
+    // A full first page is enough, so no search asks for page 2.
+    expect(brave.search.mock.calls.map((c) => c[0])).toEqual([
       "Indian greek yogurt snack recipe",
       "Indian egg snack recipe",
       "Indian cottage cheese snack recipe",
@@ -249,9 +249,9 @@ describe("findTopRecipes", () => {
       "Thai egg snack recipe",
       "Thai cottage cheese snack recipe",
     ]);
-    // 6 searches of 2 pages, with a pause before all but the first.
-    expect(brave.search).toHaveBeenCalledTimes(12);
-    expect(wait).toHaveBeenCalledTimes(11);
+    expect(brave.search.mock.calls.every((c) => c[2] === 0)).toBe(true);
+    // A pause before all but the first search.
+    expect(wait).toHaveBeenCalledTimes(5);
     expect(wait).toHaveBeenCalledWith(1100);
     // Indian's and Thai's links alternate, up to the page limit.
     const read = readPage.mock.calls.map((c) => c[0]);
@@ -263,6 +263,33 @@ describe("findTopRecipes", () => {
       "https://Thai.test/1",
     ]);
     expect(result.top).toEqual([]);
+  });
+
+  it("starts no new page after the deadline", async () => {
+    const db = fakeRecipeTables({ seed: { heb_products: PRODUCTS } });
+    const { brave, readPage, lookup } = fakes();
+    let clock = 0;
+    readPage.mockImplementation(async () => {
+      clock += PAGE_DEADLINE_MS; // each page read takes the whole budget
+      return null;
+    });
+
+    const result = await findTopRecipes({
+      supabase: db.client,
+      brave,
+      lookup,
+      readPage,
+      slot: "dinner",
+      cuisines: ["Indian"],
+      wait: noWait,
+      now: () => clock,
+    });
+
+    // The first 4 start together; the rest are past the deadline.
+    expect(readPage).toHaveBeenCalledTimes(4);
+    expect(
+      result.skipped.filter((s) => s.reason === "out of time"),
+    ).toHaveLength(Object.keys(PAGES).length - 4);
   });
 
   it("keeps going when one search fails, and fails when all do", async () => {

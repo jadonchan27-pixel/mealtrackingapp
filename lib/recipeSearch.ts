@@ -73,8 +73,15 @@ export function searchQueries(
   return chosen.flatMap((c) => proteins.map((p) => searchQuery(slot, c, p)));
 }
 
-// Brave result pages fetched per search (TR-24).
+// Brave result pages fetched per search (TR-24). The second page is only
+// asked for when the first gives fewer usable links than this, since links
+// are taken from all searches in turn and later pages are rarely reached.
 export const SEARCH_PAGES = 2;
+export const NEXT_PAGE_BELOW = 14;
+
+// No new recipe page is started after this long, so a slow day still
+// returns what was found inside the route's 300-second limit.
+export const PAGE_DEADLINE_MS = 240_000;
 
 // Pages read per slot: a slot runs in one request (architecture), so this
 // bounds how long it takes.
@@ -201,6 +208,7 @@ export async function findTopRecipes({
   wait = sleep,
   ingredientRange,
   weekStart,
+  now = Date.now,
 }: {
   supabase: SupabaseClient<Database>;
   brave: Pick<BraveClient, "search">;
@@ -217,7 +225,9 @@ export async function findTopRecipes({
   ingredientRange?: IngredientRange;
   // TR-24: picks the week's proteins.
   weekStart?: string;
+  now?: () => number;
 }): Promise<SlotSearchResult> {
+  const started = now();
   const lists: string[][] = [];
   const skipped: SkippedPage[] = [];
   let searchError: unknown = null;
@@ -230,8 +240,8 @@ export async function findTopRecipes({
       try {
         const found = await brave.search(q, MAX_RESULTS, page);
         list.push(...found.filter((u) => mightBeRecipePage(u)));
-        // An empty page means there are no more results.
-        if (found.length === 0) break;
+        // Enough links, or none left.
+        if (list.length >= NEXT_PAGE_BELOW || found.length === 0) break;
       } catch (err) {
         // One failed search shouldn't lose the other searches' results.
         searchError = err;
@@ -252,9 +262,12 @@ export async function findTopRecipes({
   }
   if (urls.length === 0 && searchError !== null) throw searchError;
 
-  const outcomes = await mapWithConcurrency(urls, PAGE_CONCURRENCY, (url) =>
-    saveRecipeFromUrl({ supabase, url, lookup, readPage, userId }),
-  );
+  const outcomes = await mapWithConcurrency(urls, PAGE_CONCURRENCY, (url) => {
+    if (now() - started > PAGE_DEADLINE_MS) {
+      return Promise.reject(new Error("out of time"));
+    }
+    return saveRecipeFromUrl({ supabase, url, lookup, readPage, userId });
+  });
   const recipes: RecipeRow[] = [];
   outcomes.forEach((outcome, i) => {
     const url = urls[i];
