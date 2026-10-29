@@ -15,6 +15,7 @@ const batches = await import("@/app/api/weeks/[week]/batches/route");
 const reset = await import("@/app/api/weeks/[week]/reset/route");
 const shopping = await import("@/app/api/weeks/[week]/shopping-list/route");
 const shoppingItem = await import("@/app/api/shopping-list/[id]/route");
+const customRecipe = await import("@/app/api/weeks/[week]/custom-recipe/route");
 
 function signedIn(seed: Parameters<typeof fakeRecipeTables>[0] = {}) {
   const db = fakeRecipeTables(seed);
@@ -381,5 +382,49 @@ describe("PATCH /api/shopping-list/:id", () => {
       );
       expect(missing.status).toBe(404);
     }
+  });
+});
+
+describe("POST /api/weeks/:id/custom-recipe", () => {
+  const body = {
+    slot: "breakfast",
+    title: "Overnight oats",
+    servings: 2,
+    kcal: 420,
+    proteinG: 25,
+    carbsG: 55,
+    fatG: 10,
+  };
+
+  it("checks the fields and the week", async () => {
+    signedIn();
+    const bad = await customRecipe.POST(
+      request("POST", { ...body, kcal: 0 }),
+      params({ week: "1" }),
+    );
+    expect(bad.status).toBe(400);
+    expect((await bad.json()).errors.kcal).toMatch(/Calories/);
+    const missing = await customRecipe.POST(
+      request("POST", body),
+      params({ week: "9" }),
+    );
+    expect(missing.status).toBe(404);
+  });
+
+  it("picks the own recipe for the slot", async () => {
+    signedIn({
+      seed: {
+        week_plans: [{ id: 1, week_start: "2026-11-01", status: "draft" }],
+      },
+    });
+    const res = await customRecipe.POST(
+      request("POST", body),
+      params({ week: "1" }),
+    );
+    expect(res.status).toBe(200);
+    const { week: saved } = await res.json();
+    expect(saved.candidates.breakfast).toMatchObject([
+      { selected: true, recipe: { title: "Overnight oats", kcal: 420 } },
+    ]);
   });
 });
