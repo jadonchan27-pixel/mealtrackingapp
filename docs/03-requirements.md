@@ -47,6 +47,9 @@ _Builds on [01-project-plan.md](01-project-plan.md) and the step 2 facet docs (`
 - **US-14** As Jadon, each new week's recipes are different from the previous week's.
 - **US-28** As Jadon, I can set a range for how many ingredients a dish needs (e.g. 3–5), and the shortlist only offers dishes within it. Pantry staples (salt, pepper, cooking oil, water) don't count.
 - **US-29** As Jadon, I can start a week's plan over (e.g. I don't want Mexican after all): its shortlist, picks and any finalized plan are cleared and I choose cuisines again. The app asks me to confirm first and warns me if I've already logged meals that week.
+- **US-30** As Jadon, the recipe search looks wider: more kinds of protein (not just chicken and beef for dinner), rotating from week to week, and more pages per meal.
+- **US-31** As Jadon, I can set a maximum cost per serving (e.g. $4) on my profile, and the shortlist only offers dishes at or under it. A dish the app can't price yet is still offered, marked "price unknown". If too few dishes fit, the cheapest others fill the shortlist, marked with how far over they are.
+- **US-32** As Jadon, I can set a weekly grocery budget (e.g. $80) on my profile, and the finalized week and shopping list show the estimated total against it, with a warning when it's over.
 
 ### Shopping list
 - **US-15** As Jadon, after finalizing the plan I get one shopping list for the week, including staples.
@@ -94,6 +97,9 @@ _Builds on [01-project-plan.md](01-project-plan.md) and the step 2 facet docs (`
 - **TR-14** Batch quantities for 4 days (Sunday batch) and 3 days (Thursday batch).
 - **TR-22** Ingredient count per recipe = its ingredient lines with a food, minus pantry staples (salt, black pepper, cooking oils and sprays, water) and optional lines. Recipes outside the profile's min–max range are left out of the candidates, like the 60-minute limit. No range set means no limit.
 - **TR-23** Starting a week over deletes its week plan, candidates, plan items, shopping list and planned log entries (confirmed or skipped ones too). Restaurant log entries are kept. A week whose plan has logged meals (confirmed, skipped or restaurant) reports how many, so the confirm can warn.
+- **TR-24** Search breadth: each slot has a list of proteins (breakfast: egg, greek yogurt, cottage cheese, turkey sausage, tofu; lunch: chicken, lentil, tuna, turkey, black bean, shrimp; dinner: chicken, beef, pork, salmon, shrimp, tofu, turkey; snack: greek yogurt, egg, cottage cheese, edamame). Each week uses 3 of them per slot, starting at a point set by the week's date, so consecutive weeks differ. Each query fetches 2 Brave pages (offset 0 and 1). Up to 40 pages are read per slot, still in one request within the 300-second limit. Video and social sites stay excluded, because they have no readable ingredient list.
+- **TR-25** Cost cap: recipes whose cost per serving is over the profile's `max_cost_cents_per_serving` are left out of the candidates; recipes with no cost are kept and shown as "price unknown". When fewer than 3 recipes fit, the cheapest over-cap recipes fill the remaining places, each showing how much it's over. No cap set means no limit.
+- **TR-26** Weekly budget: the finalized week and shopping list show the estimated weekly total (the shopping list total) beside `weekly_budget_cents`, with a warning when the total is higher. No budget set means nothing is shown.
 
 ### Shopping and pricing
 - **TR-15** Ingredient aggregation across recipes with unit conversion.
