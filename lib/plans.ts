@@ -893,6 +893,20 @@ export async function changeDish(
     );
   }
 
+  // Meals from today that were skipped or eaten out stay skipped, but as the
+  // new dish, so un-skipping or removing the eat-out brings back the new one.
+  check(
+    await supabase
+      .from("log_entries")
+      .update({
+        plan_item_id: item!.id,
+        portion: servings / slotsOf(candidate.slot).length,
+      })
+      .eq("plan_item_id", old.id)
+      .eq("kind", "planned")
+      .eq("status", "skipped")
+      .in("date", dates),
+  );
   // The old dish's remaining planned meals give way to the new one.
   check(
     await supabase

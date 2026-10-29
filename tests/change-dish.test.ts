@@ -3,7 +3,11 @@
 // one at rescaled portions, with the shopping list built from the new dishes.
 
 import { describe, expect, it } from "vitest";
-import { updateLogEntry } from "@/lib/log";
+import {
+  addRestaurantEntry,
+  deleteRestaurantEntry,
+  updateLogEntry,
+} from "@/lib/log";
 import { changeDish, finalizeWeek, loadWeekById } from "@/lib/plans";
 import { writeShoppingList } from "@/lib/shopping";
 import { fakeRecipeTables } from "@/tests/helpers/fakeRecipeTables";
@@ -185,6 +189,87 @@ describe("changeDish", () => {
     const back = await changeDish(db.client, 1, 2, TARGETS, "2026-10-29");
     expect(back.items.map((i) => i.recipe.id)).toEqual([1, 2]);
     expect(db.table("log_entries")).toHaveLength(21);
+  });
+
+  it("keeps a later eat-out and skip skipped, as the new dish", async () => {
+    const { db, week } = await finalWeek();
+    const oldLunch = week.items.find((i) => i.slot === "lunch")!;
+    await addRestaurantEntry(db.client, {
+      date: "2026-11-05",
+      slot: "dinner",
+      restaurantName: "Torchy's Tacos",
+      itemName: "Trailer Park taco",
+      amount: 1,
+      kcal: 570,
+      proteinG: 30,
+      carbsG: 35,
+      fatG: 34,
+    });
+    const friLunch = entriesOn(db, "2026-11-06").find(
+      (e) => e.slot === "lunch",
+    )!;
+    await updateLogEntry(db.client, friLunch.id as number, {
+      status: "skipped",
+    });
+
+    const changed = await changeDish(db.client, 1, 3, TARGETS, "2026-11-04");
+    const lunch = changed.items.find((i) => i.slot === "lunch")!;
+    const planned = (date: string, slot: string) =>
+      entriesOn(db, date).filter(
+        (e) => e.slot === slot && e.kind === "planned",
+      );
+    for (const [date, slot] of [
+      ["2026-11-05", "dinner"],
+      ["2026-11-06", "lunch"],
+    ]) {
+      expect(
+        planned(date, slot).map((e) => [e.plan_item_id, e.status, e.portion]),
+      ).toEqual([[lunch.id, "skipped", lunch.servingsPerDay / 2]]);
+    }
+    // Days from today no longer use the old dish.
+    expect(
+      db
+        .table("log_entries")
+        .filter((e) => e.plan_item_id === oldLunch.id)
+        .every((e) => String(e.date) < "2026-11-04"),
+    ).toBe(true);
+
+    // Undoing either brings back the new dish, not the old one.
+    const tacos = entriesOn(db, "2026-11-05").find(
+      (e) => e.kind === "restaurant",
+    )!;
+    await deleteRestaurantEntry(db.client, tacos.id as number);
+    await updateLogEntry(db.client, friLunch.id as number, {
+      status: "planned",
+    });
+    for (const [date, slot] of [
+      ["2026-11-05", "dinner"],
+      ["2026-11-06", "lunch"],
+    ]) {
+      expect(
+        planned(date, slot).map((e) => [e.plan_item_id, e.status]),
+      ).toEqual([[lunch.id, "planned"]]);
+    }
+  });
+
+  it("removes the old dish once a change before the week starts frees it", async () => {
+    const { db, week } = await finalWeek();
+    const oldLunch = week.items.find((i) => i.slot === "lunch")!;
+    await addRestaurantEntry(db.client, {
+      date: "2026-11-02",
+      slot: "lunch",
+      restaurantName: "Torchy's Tacos",
+      itemName: "Trailer Park taco",
+      amount: 1,
+      kcal: 570,
+      proteinG: 30,
+      carbsG: 35,
+      fatG: 34,
+    });
+    await changeDish(db.client, 1, 3, TARGETS, "2026-10-29");
+    expect(db.table("plan_items").some((i) => i.id === oldLunch.id)).toBe(
+      false,
+    );
   });
 
   it("refuses a draft, a finished week and the current dish", async () => {
