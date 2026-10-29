@@ -15,6 +15,7 @@ import {
   SLOT_PROTEINS,
   weekProteins,
   searchQuery,
+  simplePrefix,
 } from "@/lib/recipeSearch";
 import { RecipePageError, type RecipePage } from "@/lib/services/recipePage";
 import { fakeRecipeTables } from "@/tests/helpers/fakeRecipeTables";
@@ -393,6 +394,66 @@ describe("searchQuery", () => {
         (p) => `Thai ${p} dinner recipe`,
       ),
     );
+  });
+});
+
+// Step 20f (TR-27): simple-recipe searches under an ingredient limit or cap.
+describe("simple-recipe searches", () => {
+  it("asks for easy, few-ingredient and cheap recipes", () => {
+    expect(simplePrefix()).toBeNull();
+    expect(simplePrefix({ maxIngredients: null, cheap: false })).toBeNull();
+    expect(simplePrefix({ maxIngredients: 5 })).toBe("easy 5 ingredient");
+    expect(simplePrefix({ maxIngredients: 6 })).toBe("easy 5 ingredient");
+    expect(simplePrefix({ maxIngredients: 10 })).toBe("easy few ingredient");
+    expect(simplePrefix({ cheap: true })).toBe("cheap easy");
+    expect(simplePrefix({ maxIngredients: 10, cheap: true })).toBe(
+      "cheap easy few ingredient",
+    );
+  });
+
+  it("runs each simple search before its plain one", () => {
+    expect(
+      searchQueries("lunch", ["Mexican"], undefined, {
+        maxIngredients: 10,
+        cheap: true,
+      }),
+    ).toEqual([
+      "cheap easy few ingredient Mexican chicken dinner recipe",
+      "Mexican chicken dinner recipe",
+      "cheap easy few ingredient Mexican lentil dinner recipe",
+      "Mexican lentil dinner recipe",
+      "cheap easy few ingredient Mexican black bean dinner recipe",
+      "Mexican black bean dinner recipe",
+    ]);
+    expect(searchQueries("lunch", [], undefined, {})).toEqual(
+      searchQueries("lunch"),
+    );
+  });
+
+  it("is used by the slot search under an ingredient limit and cap", async () => {
+    const db = fakeRecipeTables({ seed: { heb_products: PRODUCTS } });
+    const { brave, readPage, lookup } = fakes();
+    await findTopRecipes({
+      supabase: db.client,
+      brave,
+      lookup,
+      readPage,
+      slot: "lunch",
+      cuisines: ["Indian"],
+      wait: noWait,
+      ingredientRange: { min: 3, max: 10 },
+      costCap: { cents: 500, dailyKcal: 2400 },
+    });
+    const queries = [
+      ...new Set(
+        (brave.search.mock.calls as unknown as [string][]).map((c) => c[0]),
+      ),
+    ];
+    expect(queries.slice(0, 2)).toEqual([
+      "cheap easy few ingredient Indian chicken dinner recipe",
+      "Indian chicken dinner recipe",
+    ]);
+    expect(queries).toHaveLength(6);
   });
 });
 
