@@ -131,4 +131,17 @@ describe("scalePortions", () => {
       Math.round((shared.servingsPerDay / 2) * 4),
     );
   });
+
+  it("tops up the shared dish's protein by at most half a serving a day", () => {
+    const recipes = [
+      recipe("breakfast", 1, 500, 5),
+      { ...recipe("lunch", 2, 100, 60), meals: 2 },
+    ];
+    const plain = scalePortions(
+      recipes.map((r) => ({ ...r, proteinG: 0 })),
+      { kcal: 3000, proteinG: 0 },
+    );
+    const topped = scalePortions(recipes, { kcal: 3000, proteinG: 4000 });
+    expect(topped[1].servingsPerDay - plain[1].servingsPerDay).toBe(0.5);
+  });
 });

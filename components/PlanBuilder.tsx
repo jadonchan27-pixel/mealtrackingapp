@@ -447,8 +447,8 @@ function Shortlist({
             {runningAll
               ? "Finding recipes…"
               : empty.length === PLAN_SLOTS.length
-                ? "Find recipes for every meal"
-                : `Find recipes for the other ${empty.length === 1 ? "meal" : `${empty.length} meals`}`}
+                ? "Find recipes for both dishes"
+                : "Find recipes for the other dish"}
           </button>
         )}
         {picked === PLAN_SLOTS.length && (

@@ -3,7 +3,7 @@ import { WeekBudget } from "@/components/Budget";
 import { RecipePhoto } from "@/components/RecipeFacts";
 import type { PlanItemView, WeekView } from "@/lib/plans";
 import { dailyTotals } from "@/lib/scaling";
-import { isSharedWeek, planSlotLabel } from "@/lib/weeks";
+import { isSharedWeek, mealsPerDay, planSlotLabel } from "@/lib/weeks";
 
 export type DailyTargets = {
   kcal: number;
@@ -38,6 +38,17 @@ export function servingsLabel(servings: number): string {
         ? part
         : `${whole}${part}`;
   return `${amount} ${servings > 1 ? "servings" : "serving"}`;
+}
+
+// "2 servings a day", or for the lunch-and-dinner dish (US-33)
+// "1½ servings at lunch and 1½ at dinner".
+export function dailyServingsLabel(
+  servingsPerDay: number,
+  meals: number,
+): string {
+  if (meals < 2) return `${servingsLabel(servingsPerDay)} a day`;
+  const each = servingsLabel(servingsPerDay / meals);
+  return `${each} at lunch and ${each.split(" ")[0]} at dinner`;
 }
 
 // How far a total is from its target: "+3%", "−12%", "on target".
@@ -108,10 +119,19 @@ export function FinalWeek({
               </Link>
             </h3>
             <p className="recipe-meta">
-              <span>{servingsLabel(item.servingsPerDay)} a day</span>
+              <span>
+                {dailyServingsLabel(
+                  item.servingsPerDay,
+                  mealsPerDay(item.slot, shared),
+                )}
+              </span>
               {item.recipe.kcal !== null && (
                 <span>
-                  {Math.round(item.recipe.kcal * item.servingsPerDay)} kcal
+                  {Math.round(
+                    (item.recipe.kcal * item.servingsPerDay) /
+                      mealsPerDay(item.slot, shared),
+                  )}{" "}
+                  kcal{mealsPerDay(item.slot, shared) > 1 && " each"}
                 </span>
               )}
             </p>

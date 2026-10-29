@@ -126,10 +126,12 @@ export function scalePortions(
     (a, b) => b.proteinG - a.proteinG,
   )[0];
   if (proteinPick) {
-    for (let extra = 0; extra < MAX_PROTEIN_TOP_UP; extra += SERVING_STEP) {
+    // A dish eaten at two meals grows a quarter at each, half a serving a
+    // day, so its day still gains at most MAX_PROTEIN_TOP_UP.
+    const step = SERVING_STEP * (proteinPick.meals ?? 1);
+    for (let extra = step; extra <= MAX_PROTEIN_TOP_UP + 1e-9; extra += step) {
       const totals = dailyTotals(items);
       if (totals.proteinG >= targets.proteinG) break;
-      const step = SERVING_STEP * (proteinPick.meals ?? 1);
       if (totals.kcal + proteinPick.kcal * step > maxKcal) break;
       proteinPick.servingsPerDay += step;
     }
