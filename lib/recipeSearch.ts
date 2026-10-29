@@ -167,9 +167,6 @@ export type SkippedPage = { url: string; reason: string };
 
 export const SEARCH_PAUSE_MS = 1100;
 
-// Over-cap recipes fill a slot's shortlist up to this many (TR-25).
-export const MIN_CANDIDATES = 3;
-
 function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
@@ -340,9 +337,7 @@ export async function findTopRecipes({
     limit: costCap ? Infinity : limit,
   });
   return {
-    top: costCap
-      ? applyCostCap(ranked, slot, costCap, limit, MIN_CANDIDATES)
-      : ranked,
+    top: costCap ? applyCostCap(ranked, slot, costCap, limit) : ranked,
     recipes: priced,
     skipped,
   };

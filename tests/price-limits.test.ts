@@ -107,14 +107,14 @@ describe("price limits", () => {
     for (const c of all) expect(c.cost).not.toBeNull();
   });
 
-  it("shortlists only meals at or under the cap, then the cheapest over it", async () => {
+  it("lists meals at or under the cap first, then every one over it, cheapest first", async () => {
     const uncapped = await shortlist(null);
     // At least one meal fits a cap at the cheapest shortlisted cost.
     const cap = Math.min(...uncapped.map((c) => c.cost!));
     const capped = await shortlist(cap);
 
-    // Every meal that fits, topped up to 3 with the cheapest over the cap.
-    expect(capped.length).toBeGreaterThanOrEqual(3);
+    // Step 20e: every option is kept, over-cap ones after the ones that fit.
+    expect(capped).toHaveLength(uncapped.length);
     const fits = capped.filter((c) => c.cost! <= cap);
     const over = capped.slice(fits.length);
     expect(fits.length).toBeGreaterThan(0);
@@ -133,7 +133,7 @@ describe("price limits", () => {
         ),
       ).toMatch(/^\$\d+\.\d\d over$/);
     }
-    // Over-cap fillers come cheapest first.
+    // Over-cap meals come cheapest first.
     const overCosts = over.map((c) => c.cost!);
     expect(overCosts).toEqual([...overCosts].sort((a, b) => a - b));
   });
