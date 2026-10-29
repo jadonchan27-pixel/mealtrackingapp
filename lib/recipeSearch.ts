@@ -19,13 +19,39 @@ import type { RecipePage } from "@/lib/services/recipePage";
 // Protein foods to search for in each slot. "high protein" in the query
 // mostly finds roundup articles (1 usable recipe in 20 in the live check),
 // while naming a protein finds single recipes (8 in 20); ranking still
-// favors protein per calorie.
+// favors protein per calorie. TR-24: each week searches a few of them.
 export const SLOT_PROTEINS: Record<MealSlot, readonly string[]> = {
-  breakfast: ["egg", "greek yogurt"],
-  lunch: ["chicken", "lentil"],
-  dinner: ["chicken", "beef"],
-  snack: ["greek yogurt", "egg"],
+  breakfast: [
+    "egg",
+    "greek yogurt",
+    "cottage cheese",
+    "turkey sausage",
+    "tofu",
+  ],
+  lunch: ["chicken", "lentil", "tuna", "turkey", "black bean", "shrimp"],
+  dinner: ["chicken", "beef", "pork", "salmon", "shrimp", "tofu", "turkey"],
+  snack: ["greek yogurt", "egg", "cottage cheese", "edamame"],
 };
+
+// Proteins searched per slot each week.
+export const PROTEINS_PER_WEEK = 3;
+
+const WEEK_MS = 7 * 24 * 60 * 60 * 1000;
+
+// TR-24: this week's proteins for a slot. Each week starts 3 further along
+// the list (wrapping), so consecutive weeks search different proteins.
+export function weekProteins(slot: MealSlot, weekStart?: string): string[] {
+  const list = SLOT_PROTEINS[slot];
+  const week = weekStart
+    ? Math.round(Date.parse(`${weekStart}T00:00:00Z`) / WEEK_MS)
+    : 0;
+  const start =
+    (((week * PROTEINS_PER_WEEK) % list.length) + list.length) % list.length;
+  return Array.from(
+    { length: Math.min(PROTEINS_PER_WEEK, list.length) },
+    (_, i) => list[(start + i) % list.length],
+  );
+}
 
 // e.g. "Indian chicken dinner recipe"
 export function searchQuery(
@@ -36,20 +62,30 @@ export function searchQuery(
   return [cuisine?.trim(), protein, slot, "recipe"].filter(Boolean).join(" ");
 }
 
-// One search per cuisine (or one with none) and protein.
+// One search per cuisine (or one with none) and protein of the week.
 export function searchQueries(
   slot: MealSlot,
   cuisines: readonly string[] = [],
+  weekStart?: string,
 ): string[] {
   const chosen = cuisines.length > 0 ? cuisines : [undefined];
-  return chosen.flatMap((c) =>
-    SLOT_PROTEINS[slot].map((p) => searchQuery(slot, c, p)),
-  );
+  const proteins = weekProteins(slot, weekStart);
+  return chosen.flatMap((c) => proteins.map((p) => searchQuery(slot, c, p)));
 }
+
+// Brave result pages fetched per search (TR-24). The second page is only
+// asked for when the first gives fewer usable links than this, since links
+// are taken from all searches in turn and later pages are rarely reached.
+export const SEARCH_PAGES = 2;
+export const NEXT_PAGE_BELOW = 14;
+
+// No new recipe page is started after this long, so a slow day still
+// returns what was found inside the route's 300-second limit.
+export const PAGE_DEADLINE_MS = 240_000;
 
 // Pages read per slot: a slot runs in one request (architecture), so this
 // bounds how long it takes.
-export const MAX_PAGES = MAX_RESULTS;
+export const MAX_PAGES = 2 * MAX_RESULTS;
 // Pages read at the same time.
 const PAGE_CONCURRENCY = 4;
 
@@ -171,6 +207,8 @@ export async function findTopRecipes({
   userId,
   wait = sleep,
   ingredientRange,
+  weekStart,
+  now = Date.now,
 }: {
   supabase: SupabaseClient<Database>;
   brave: Pick<BraveClient, "search">;
@@ -185,22 +223,33 @@ export async function findTopRecipes({
   wait?: (ms: number) => Promise<void>;
   // US-28: how many ingredients a dish may need (pantry staples left out).
   ingredientRange?: IngredientRange;
+  // TR-24: picks the week's proteins.
+  weekStart?: string;
+  now?: () => number;
 }): Promise<SlotSearchResult> {
+  const started = now();
   const lists: string[][] = [];
   const skipped: SkippedPage[] = [];
   let searchError: unknown = null;
-  for (const [i, q] of searchQueries(slot, cuisines).entries()) {
-    // Brave's free plan allows about one request per second.
-    if (i > 0) await wait(SEARCH_PAUSE_MS);
-    try {
-      lists.push(
-        (await brave.search(q, MAX_RESULTS)).filter(mightBeRecipePage),
-      );
-    } catch (err) {
-      // One failed search shouldn't lose the other searches' results.
-      searchError = err;
-      skipped.push({ url: `search: ${q}`, reason: errorMessage(err) });
+  let searches = 0;
+  for (const q of searchQueries(slot, cuisines, weekStart)) {
+    const list: string[] = [];
+    for (let page = 0; page < SEARCH_PAGES; page++) {
+      // Brave's free plan allows about one request per second.
+      if (searches++ > 0) await wait(SEARCH_PAUSE_MS);
+      try {
+        const found = await brave.search(q, MAX_RESULTS, page);
+        list.push(...found.filter((u) => mightBeRecipePage(u)));
+        // Enough links, or none left.
+        if (list.length >= NEXT_PAGE_BELOW || found.length === 0) break;
+      } catch (err) {
+        // One failed search shouldn't lose the other searches' results.
+        searchError = err;
+        skipped.push({ url: `search: ${q}`, reason: errorMessage(err) });
+        break;
+      }
     }
+    if (list.length > 0) lists.push(list);
   }
   // Take the searches' results in turn, so each gets its best links in.
   const urls: string[] = [];
@@ -213,9 +262,12 @@ export async function findTopRecipes({
   }
   if (urls.length === 0 && searchError !== null) throw searchError;
 
-  const outcomes = await mapWithConcurrency(urls, PAGE_CONCURRENCY, (url) =>
-    saveRecipeFromUrl({ supabase, url, lookup, readPage, userId }),
-  );
+  const outcomes = await mapWithConcurrency(urls, PAGE_CONCURRENCY, (url) => {
+    if (now() - started > PAGE_DEADLINE_MS) {
+      return Promise.reject(new Error("out of time"));
+    }
+    return saveRecipeFromUrl({ supabase, url, lookup, readPage, userId });
+  });
   const recipes: RecipeRow[] = [];
   outcomes.forEach((outcome, i) => {
     const url = urls[i];

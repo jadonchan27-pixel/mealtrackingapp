@@ -376,6 +376,7 @@ export async function searchSlot({
     excludedIds,
     readPage,
     wait,
+    weekStart: week.week_start,
   });
 
   check(

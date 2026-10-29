@@ -7,10 +7,13 @@ import type { FoodRow } from "@/lib/db/types";
 import {
   findTopRecipes,
   MAX_PAGES,
+  PAGE_DEADLINE_MS,
   mightBeRecipePage,
   previousWeekRecipeIds,
   previousWeekStart,
   searchQueries,
+  SLOT_PROTEINS,
+  weekProteins,
   searchQuery,
 } from "@/lib/recipeSearch";
 import { RecipePageError, type RecipePage } from "@/lib/services/recipePage";
@@ -145,9 +148,14 @@ describe("findTopRecipes", () => {
       wait: noWait,
     });
 
+    // Each of the week's 3 proteins; page 1 has under 14 links, so page 2 too.
     expect(brave.search.mock.calls).toEqual([
-      ["Indian chicken dinner recipe", 20],
-      ["Indian beef dinner recipe", 20],
+      ["Indian chicken dinner recipe", 20, 0],
+      ["Indian chicken dinner recipe", 20, 1],
+      ["Indian beef dinner recipe", 20, 0],
+      ["Indian beef dinner recipe", 20, 1],
+      ["Indian pork dinner recipe", 20, 0],
+      ["Indian pork dinner recipe", 20, 1],
     ]);
     // Per serving (protein per 100 kcal, cost):
     //   Tandoori 430 kcal, 13.7 g, $2.70   Dal    362 kcal, 5.7 g, $0.80
@@ -212,10 +220,10 @@ describe("findTopRecipes", () => {
     const db = fakeRecipeTables();
     const { readPage, lookup } = fakes();
     const brave = {
-      search: vi.fn(async (q: string) =>
+      search: vi.fn(async (q: string, _count?: number, page = 0) =>
         Array.from(
           { length: 20 },
-          (_, i) => `https://${q.split(" ")[0]}.test/${i}`,
+          (_, i) => `https://${q.split(" ")[0]}.test/${page * 20 + i}`,
         ),
       ),
     };
@@ -232,13 +240,18 @@ describe("findTopRecipes", () => {
       wait,
     });
 
+    // A full first page is enough, so no search asks for page 2.
     expect(brave.search.mock.calls.map((c) => c[0])).toEqual([
       "Indian greek yogurt snack recipe",
       "Indian egg snack recipe",
+      "Indian cottage cheese snack recipe",
       "Thai greek yogurt snack recipe",
       "Thai egg snack recipe",
+      "Thai cottage cheese snack recipe",
     ]);
-    expect(wait).toHaveBeenCalledTimes(3);
+    expect(brave.search.mock.calls.every((c) => c[2] === 0)).toBe(true);
+    // A pause before all but the first search.
+    expect(wait).toHaveBeenCalledTimes(5);
     expect(wait).toHaveBeenCalledWith(1100);
     // Indian's and Thai's links alternate, up to the page limit.
     const read = readPage.mock.calls.map((c) => c[0]);
@@ -252,6 +265,33 @@ describe("findTopRecipes", () => {
     expect(result.top).toEqual([]);
   });
 
+  it("starts no new page after the deadline", async () => {
+    const db = fakeRecipeTables({ seed: { heb_products: PRODUCTS } });
+    const { brave, readPage, lookup } = fakes();
+    let clock = 0;
+    readPage.mockImplementation(async () => {
+      clock += PAGE_DEADLINE_MS; // each page read takes the whole budget
+      return null;
+    });
+
+    const result = await findTopRecipes({
+      supabase: db.client,
+      brave,
+      lookup,
+      readPage,
+      slot: "dinner",
+      cuisines: ["Indian"],
+      wait: noWait,
+      now: () => clock,
+    });
+
+    // The first 4 start together; the rest are past the deadline.
+    expect(readPage).toHaveBeenCalledTimes(4);
+    expect(
+      result.skipped.filter((s) => s.reason === "out of time"),
+    ).toHaveLength(Object.keys(PAGES).length - 4);
+  });
+
   it("keeps going when one search fails, and fails when all do", async () => {
     const db = fakeRecipeTables({ seed: { heb_products: PRODUCTS } });
     const { readPage, lookup } = fakes();
@@ -260,7 +300,7 @@ describe("findTopRecipes", () => {
       search: vi
         .fn()
         .mockRejectedValueOnce(limited)
-        .mockResolvedValueOnce(["https://c.test/dal"]),
+        .mockResolvedValue(["https://c.test/dal"]),
     };
     const run = () =>
       findTopRecipes({
@@ -317,15 +357,53 @@ describe("searchQuery", () => {
     expect(searchQuery("lunch")).toBe("lunch recipe");
   });
 
-  it("searches each slot protein, with or without a cuisine", () => {
+  it("searches each of the week's proteins, with or without a cuisine", () => {
     expect(searchQueries("lunch")).toEqual([
       "chicken lunch recipe",
       "lentil lunch recipe",
+      "tuna lunch recipe",
     ]);
-    expect(searchQueries("dinner", ["Thai"])).toEqual([
-      "Thai chicken dinner recipe",
-      "Thai beef dinner recipe",
-    ]);
+    expect(searchQueries("dinner", ["Thai"], "2026-11-01")).toEqual(
+      weekProteins("dinner", "2026-11-01").map(
+        (p) => `Thai ${p} dinner recipe`,
+      ),
+    );
+  });
+});
+
+describe("weekProteins", () => {
+  const weeks = ["2026-11-01", "2026-11-08", "2026-11-15", "2026-11-22"];
+
+  it("picks 3 proteins a week from the slot's list", () => {
+    for (const slot of ["breakfast", "lunch", "dinner", "snack"] as const) {
+      for (const week of weeks) {
+        const proteins = weekProteins(slot, week);
+        expect(proteins).toHaveLength(3);
+        expect(new Set(proteins).size).toBe(3);
+        for (const p of proteins) expect(SLOT_PROTEINS[slot]).toContain(p);
+      }
+    }
+  });
+
+  it("searches different proteins in consecutive weeks", () => {
+    for (const slot of ["breakfast", "lunch", "dinner", "snack"] as const) {
+      for (let i = 1; i < weeks.length; i++) {
+        expect(weekProteins(slot, weeks[i])).not.toEqual(
+          weekProteins(slot, weeks[i - 1]),
+        );
+      }
+    }
+    // Dinner has 7 proteins, so back-to-back weeks share none.
+    const [a, b] = [
+      weekProteins("dinner", weeks[0]),
+      weekProteins("dinner", weeks[1]),
+    ];
+    expect(a.filter((p) => b.includes(p))).toEqual([]);
+  });
+
+  it("covers every dinner protein within a few weeks", () => {
+    const seen = new Set(weeks.flatMap((w) => weekProteins("dinner", w)));
+    expect(seen).toEqual(new Set(SLOT_PROTEINS.dinner));
   });
 });
 
