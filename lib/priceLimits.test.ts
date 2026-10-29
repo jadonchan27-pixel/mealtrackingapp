@@ -74,6 +74,30 @@ describe("applyCostCap", () => {
     ]);
   });
 
+  it("keeps every fitting recipe but only fills up to `fill`", () => {
+    const ranked = [
+      r(1, 640, 900),
+      r(2, 640, 300),
+      r(3, 640, 600),
+      r(4, 640, 700),
+      r(5, 640, 100),
+    ];
+    // 2 fit; over-cap ones top up to 3.
+    expect(
+      applyCostCap(ranked, "dinner", cap, Infinity, 3).map((x) => x.id),
+    ).toEqual([2, 5, 3]);
+    const cheap = [
+      r(1, 640, 100),
+      r(2, 640, 200),
+      r(3, 640, 300),
+      r(4, 640, 350),
+      r(5, 640, 900),
+    ];
+    expect(
+      applyCostCap(cheap, "dinner", cap, Infinity, 3).map((x) => x.id),
+    ).toEqual([1, 2, 3, 4]);
+  });
+
   it("caps the portion's cost, not one serving's", () => {
     // $2.50 a serving, but 2 servings make a $5 meal.
     expect(

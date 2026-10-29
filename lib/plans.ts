@@ -351,11 +351,14 @@ export async function searchSlot({
   const others = rows(
     await supabase
       .from("plan_candidates")
-      .select("slot, recipe_id")
+      .select("slot, recipe_id, selected")
       .eq("week_plan_id", week.id),
   );
+  // Another meal's pick can't be this one's too. Other candidates can be
+  // shared, now every recipe that fits is kept (US-8); selectCandidate
+  // refuses a recipe already picked elsewhere.
   for (const c of others) {
-    if (c.slot !== slot) excludedIds.add(c.recipe_id);
+    if (c.slot !== slot && c.selected) excludedIds.add(c.recipe_id);
   }
 
   const profile = check(
@@ -380,6 +383,8 @@ export async function searchSlot({
     readPage,
     wait,
     weekStart: week.week_start,
+    // US-8: every recipe that fits, best first.
+    limit: Infinity,
   });
 
   check(

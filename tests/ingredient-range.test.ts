@@ -83,6 +83,8 @@ describe("ingredient range", () => {
   });
 
   it("doesn't limit without a range", async () => {
-    expect(await shortlist({ min: null, max: null })).toHaveLength(3);
+    expect(await shortlist({ min: null, max: null })).toHaveLength(
+      PAGES.length,
+    );
   });
 });

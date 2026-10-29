@@ -103,7 +103,7 @@ async function shortlist(capCents: number | null) {
 describe("price limits", () => {
   it("prices every test meal", async () => {
     const all = await shortlist(null);
-    expect(all).toHaveLength(3);
+    expect(all).toHaveLength(PAGES.length);
     for (const c of all) expect(c.cost).not.toBeNull();
   });
 
@@ -113,7 +113,8 @@ describe("price limits", () => {
     const cap = Math.min(...uncapped.map((c) => c.cost!));
     const capped = await shortlist(cap);
 
-    expect(capped).toHaveLength(3);
+    // Every meal that fits, topped up to 3 with the cheapest over the cap.
+    expect(capped.length).toBeGreaterThanOrEqual(3);
     const fits = capped.filter((c) => c.cost! <= cap);
     const over = capped.slice(fits.length);
     expect(fits.length).toBeGreaterThan(0);

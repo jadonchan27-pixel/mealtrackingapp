@@ -53,13 +53,14 @@ export function mealCostCents(
 export type CostCap = { cents: number; dailyKcal: number };
 
 // TR-25: ranked recipes (best first) within the cap keep their order, and
-// unpriced ones count as within it; if fewer than `limit` fit, the cheapest
-// over-cap meals fill the rest.
+// unpriced ones count as within it, up to `limit`; if fewer than `fill` fit,
+// the cheapest over-cap meals fill up to `fill` places.
 export function applyCostCap<T extends { recipe: CostedRecipe }>(
   ranked: readonly T[],
   slot: MealSlot,
   cap: CostCap,
   limit: number,
+  fill: number = limit,
 ): T[] {
   const cost = (r: T) => mealCostCents(r.recipe, slot, cap.dailyKcal);
   const fits = ranked.filter((r) => {
@@ -69,7 +70,11 @@ export function applyCostCap<T extends { recipe: CostedRecipe }>(
   const over = ranked
     .filter((r) => !fits.includes(r))
     .sort((a, b) => cost(a)! - cost(b)!);
-  return [...fits, ...over].slice(0, limit);
+  const filler = over.slice(
+    0,
+    Math.max(0, Math.min(fill, limit) - fits.length),
+  );
+  return [...fits.slice(0, limit), ...filler];
 }
 
 // The tag a candidate shows under a cap: "price unknown", "$1.20 over", or
