@@ -22,9 +22,12 @@ import {
 import type { BraveClient } from "@/lib/services/braveSearch";
 import type { RecipePage } from "@/lib/services/recipePage";
 import { ensureProducts } from "@/lib/products";
+import { isCustomSource } from "@/lib/recipeSource";
 import { scalePortions } from "@/lib/scaling";
 import { targetsForProfile } from "@/lib/targets";
 import {
+  currentItems,
+  isSharedWeek,
   MEAL_SLOTS,
   mealsPerDay,
   PLAN_SLOTS,
@@ -183,7 +186,13 @@ async function weekView(supabase: Supabase, week: WeekPlanRow) {
     cuisines: week.cuisines,
     status: week.status,
     candidates: await candidateViews(supabase, candidateRows),
-    items: await itemViews(supabase, itemRows),
+    items: await itemViews(
+      supabase,
+      currentItems(
+        itemRows,
+        candidateRows.filter((c) => c.selected),
+      ),
+    ),
     loggedMeals: await loggedMeals(
       supabase,
       week.week_start,
@@ -394,13 +403,50 @@ export async function searchSlot({
     limit: Infinity,
   });
 
-  check(
+  // US-35: Jadon's own recipes stay on the shortlist, unpicked, after it.
+  const slotRows = others.filter((c) => c.slot === slot);
+  const own = new Set(
+    slotRows.length === 0
+      ? []
+      : rows(
+          await supabase
+            .from("recipes")
+            .select("id, source_url")
+            .in(
+              "id",
+              slotRows.map((c) => c.recipe_id),
+            ),
+        )
+          .filter((r) => isCustomSource(r.source_url))
+          .map((r) => r.id),
+  );
+  const replaced = rows(
     await supabase
       .from("plan_candidates")
-      .delete()
+      .select("id, recipe_id")
       .eq("week_plan_id", week.id)
       .eq("slot", slot),
-  );
+  ).filter((c) => !own.has(c.recipe_id));
+  if (replaced.length > 0) {
+    check(
+      await supabase
+        .from("plan_candidates")
+        .delete()
+        .in(
+          "id",
+          replaced.map((c) => c.id),
+        ),
+    );
+  }
+  if (own.size > 0) {
+    check(
+      await supabase
+        .from("plan_candidates")
+        .update({ selected: false })
+        .eq("week_plan_id", week.id)
+        .eq("slot", slot),
+    );
+  }
   if (found.top.length > 0) {
     check(
       await supabase.from("plan_candidates").insert(
@@ -678,4 +724,232 @@ export async function resetWeek(
     check(await supabase.from(table).delete().eq("week_plan_id", week.id));
   }
   check(await supabase.from("week_plans").delete().eq("id", week.id));
+}
+
+// US-36, TR-30: changes a finalized week's dish to another candidate from
+// `today` (Austin) to Saturday. The candidate becomes the slot's pick and
+// gets a plan item; portions are scaled again for the whole day. Each
+// remaining day's planned entries that are still `planned` move to the new
+// dish (the other dish's get its new portion); confirmed or skipped entries
+// and restaurant meals stay, and a slot eaten out gets the new dish as
+// skipped. Earlier days keep the old dish, so its plan item stays while
+// entries use it. The caller rebuilds the shopping list.
+export async function changeDish(
+  supabase: Supabase,
+  weekId: number,
+  candidateId: number,
+  targets: { kcal: number; proteinG: number },
+  today: string,
+): Promise<WeekView> {
+  const week = await weekById(supabase, weekId);
+  if (week.status !== "final") {
+    throw new PlanError("Finalize the week before changing a dish", 409);
+  }
+  const dates = weekDates(week.week_start).filter((d) => d >= today);
+  if (dates.length === 0) {
+    throw new PlanError("This week is over, so it can't be changed", 409);
+  }
+  const candidate = check(
+    await supabase
+      .from("plan_candidates")
+      .select("*")
+      .eq("id", candidateId)
+      .maybeSingle(),
+  );
+  if (!candidate || candidate.week_plan_id !== week.id) {
+    throw new PlanError("Candidate not found", 404);
+  }
+
+  const picks = rows(
+    await supabase
+      .from("plan_candidates")
+      .select("*")
+      .eq("week_plan_id", week.id)
+      .eq("selected", true),
+  );
+  const allItems = rows(
+    await supabase.from("plan_items").select("*").eq("week_plan_id", week.id),
+  );
+  const current = currentItems(allItems, picks);
+  const old = current.find((i) => i.slot === candidate.slot);
+  if (!old) {
+    throw new PlanError(`This week has no ${candidate.slot} dish`, 409);
+  }
+  if (old.recipe_id === candidate.recipe_id) {
+    throw new PlanError("That recipe is already the plan", 409);
+  }
+  const elsewhere = current.find(
+    (i) => i.slot !== candidate.slot && i.recipe_id === candidate.recipe_id,
+  );
+  if (elsewhere) {
+    throw new PlanError(
+      `This recipe is already planned for ${elsewhere.slot}`,
+      409,
+    );
+  }
+
+  const shared = isSharedWeek({ items: current });
+  const slotsOf = (slot: MealSlot): MealSlot[] =>
+    shared && slot === SHARED_SLOT ? [SHARED_SLOT, "dinner"] : [slot];
+  const recipeIds = current.map((i) =>
+    i.slot === candidate.slot ? candidate.recipe_id : i.recipe_id,
+  );
+  const recipes = rows(
+    await supabase.from("recipes").select("*").in("id", recipeIds),
+  );
+  const scaled = scalePortions(
+    current.map((item, i) => {
+      const recipe = recipes.find((r) => r.id === recipeIds[i]);
+      if (!recipe)
+        throw new PlanError(`The ${item.slot} recipe is missing`, 409);
+      return {
+        slot: item.slot,
+        recipeId: recipe.id,
+        kcal: Number(recipe.kcal ?? 0),
+        proteinG: Number(recipe.protein_g ?? 0),
+        carbsG: Number(recipe.carbs_g ?? 0),
+        fatG: Number(recipe.fat_g ?? 0),
+        meals: mealsPerDay(item.slot, shared),
+      };
+    }),
+    targets,
+  );
+  const servingsFor = (slot: MealSlot) =>
+    scaled.find((s) => s.slot === slot)!.servingsPerDay;
+
+  // TR-16: the new dish's foods get H-E-B products for the shopping list.
+  const lines = rows(
+    await supabase
+      .from("recipe_ingredients")
+      .select("food_id")
+      .eq("recipe_id", candidate.recipe_id),
+  );
+  await ensureProducts(
+    supabase,
+    lines.map((l) => l.food_id).filter((id): id is number => id !== null),
+  );
+
+  // The pick, then the dish's plan item (one already made for this recipe,
+  // when the week switches back to it, is reused).
+  check(
+    await supabase
+      .from("plan_candidates")
+      .update({ selected: false })
+      .eq("week_plan_id", week.id)
+      .eq("slot", candidate.slot),
+  );
+  check(
+    await supabase
+      .from("plan_candidates")
+      .update({ selected: true })
+      .eq("id", candidate.id),
+  );
+  const servings = servingsFor(candidate.slot);
+  let item = allItems.find(
+    (i) => i.slot === candidate.slot && i.recipe_id === candidate.recipe_id,
+  );
+  if (item) {
+    check(
+      await supabase
+        .from("plan_items")
+        .update({ servings_per_day: servings })
+        .eq("id", item.id),
+    );
+  } else {
+    check(
+      await supabase.from("plan_items").insert({
+        week_plan_id: week.id,
+        slot: candidate.slot,
+        recipe_id: candidate.recipe_id,
+        servings_per_day: servings,
+      }),
+    );
+    item = rows(
+      await supabase
+        .from("plan_items")
+        .select("*")
+        .eq("week_plan_id", week.id)
+        .eq("slot", candidate.slot)
+        .eq("recipe_id", candidate.recipe_id),
+    )[0];
+  }
+
+  // The other dishes keep their recipe at the new portions.
+  for (const other of current.filter((i) => i.slot !== candidate.slot)) {
+    const s = servingsFor(other.slot);
+    check(
+      await supabase
+        .from("plan_items")
+        .update({ servings_per_day: s })
+        .eq("id", other.id),
+    );
+    check(
+      await supabase
+        .from("log_entries")
+        .update({ portion: s / slotsOf(other.slot).length })
+        .eq("plan_item_id", other.id)
+        .eq("status", "planned")
+        .in("date", dates),
+    );
+  }
+
+  // Meals from today that were skipped or eaten out stay skipped, but as the
+  // new dish, so un-skipping or removing the eat-out brings back the new one.
+  check(
+    await supabase
+      .from("log_entries")
+      .update({
+        plan_item_id: item!.id,
+        portion: servings / slotsOf(candidate.slot).length,
+      })
+      .eq("plan_item_id", old.id)
+      .eq("kind", "planned")
+      .eq("status", "skipped")
+      .in("date", dates),
+  );
+  // The old dish's remaining planned meals give way to the new one.
+  check(
+    await supabase
+      .from("log_entries")
+      .delete()
+      .eq("plan_item_id", old.id)
+      .eq("kind", "planned")
+      .eq("status", "planned")
+      .in("date", dates),
+  );
+  const kept = rows(
+    await supabase
+      .from("log_entries")
+      .select("date, slot, kind")
+      .in("date", dates),
+  );
+  const has = (kind: string, date: string, slot: MealSlot) =>
+    kept.some((e) => e.kind === kind && e.date === date && e.slot === slot);
+  const entries = dates.flatMap((date) =>
+    slotsOf(candidate.slot)
+      // A meal already confirmed or skipped stays as it was logged.
+      .filter((slot) => !has("planned", date, slot))
+      .map((slot) => ({
+        date,
+        slot,
+        kind: "planned" as const,
+        plan_item_id: item!.id,
+        portion: servings / slotsOf(candidate.slot).length,
+        ...(has("restaurant", date, slot)
+          ? { status: "skipped" as const }
+          : {}),
+      })),
+  );
+  if (entries.length > 0) {
+    check(await supabase.from("log_entries").insert(entries));
+  }
+
+  // The old item goes once no day uses it.
+  const stillUsed = rows(
+    await supabase.from("log_entries").select("id").eq("plan_item_id", old.id),
+  );
+  if (stillUsed.length === 0) {
+    check(await supabase.from("plan_items").delete().eq("id", old.id));
+  }
+  return weekView(supabase, week);
 }

@@ -209,7 +209,8 @@ button {
 }
 
 input,
-select {
+select,
+textarea {
   font: inherit;
   width: 100%;
   min-height: 44px;
@@ -221,7 +222,8 @@ select {
 }
 
 input[aria-invalid="true"],
-select[aria-invalid="true"] {
+select[aria-invalid="true"],
+textarea[aria-invalid="true"] {
   border-color: #c0392b;
 }
 
@@ -828,8 +830,7 @@ button:disabled {
 }
 .own-recipe summary {
   min-height: 44px;
-  display: flex;
-  align-items: center;
+  line-height: 44px;
   cursor: pointer;
   font-weight: 600;
 }
@@ -837,10 +838,28 @@ button:disabled {
   display: grid;
   gap: 8px;
 }
-.own-recipe textarea {
-  width: 100%;
-  font: inherit;
-}
 .own-recipe button[type="submit"] {
+  min-height: 44px;
+}
+
+/* US-36: changing a finalized dish */
+.change-dish {
+  min-height: 44px;
+  margin-top: 8px;
+}
+.change-dish-panel {
+  display: grid;
+  gap: 8px;
+  margin-top: 8px;
+}
+.change-options {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: grid;
+  gap: 8px;
+}
+.change-options button,
+.change-dish-panel .link-button {
   min-height: 44px;
 }

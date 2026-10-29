@@ -2,7 +2,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { Suspense } from "react";
 import { RecipeFacts, RecipePhoto } from "@/components/RecipeFacts";
-import { isCustomSource } from "@/lib/customRecipe";
+import { isCustomSource, recipeLink } from "@/lib/recipeSource";
 import { createClient } from "@/lib/db/server";
 import { loadRecipe } from "@/lib/plans";
 
@@ -71,11 +71,16 @@ async function Recipe({ params }: { params: Promise<{ id: string }> }) {
           </ol>
         )}
       </section>
-      {isCustomSource(recipe.sourceUrl) ? (
+      {isCustomSource(recipe.sourceUrl) && (
         <p className="muted">Your own recipe.</p>
-      ) : (
+      )}
+      {recipeLink(recipe.sourceUrl) && (
         <p>
-          <a href={recipe.sourceUrl} target="_blank" rel="noreferrer">
+          <a
+            href={recipeLink(recipe.sourceUrl)!}
+            target="_blank"
+            rel="noreferrer"
+          >
             Original recipe ↗
           </a>
         </p>

@@ -13,6 +13,7 @@ import type {
 import { BATCHES } from "@/lib/batches";
 import { ensureProducts } from "@/lib/products";
 import { isPlainWater } from "@/lib/typicalWeights";
+import { currentItems } from "@/lib/weeks";
 
 type Supabase = SupabaseClient<Database>;
 
@@ -214,13 +215,24 @@ export async function writeShoppingList(
   supabase: Supabase,
   weekId: number,
 ): Promise<number> {
-  const items =
+  // TR-30: only each slot's current dish.
+  const picks =
+    check(
+      await supabase
+        .from("plan_candidates")
+        .select("slot, recipe_id")
+        .eq("week_plan_id", weekId)
+        .eq("selected", true),
+    ) ?? [];
+  const items = currentItems(
     check(
       await supabase
         .from("plan_items")
-        .select("recipe_id, servings_per_day")
+        .select("id, slot, recipe_id, servings_per_day")
         .eq("week_plan_id", weekId),
-    ) ?? [];
+    ) ?? [],
+    picks,
+  );
   const recipeIds = items.map((i) => i.recipe_id);
   const recipes =
     recipeIds.length === 0

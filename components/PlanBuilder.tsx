@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useState } from "react";
+import { ChangeDish } from "@/components/ChangeDish";
 import { FinalWeek, type DailyTargets } from "@/components/FinalWeek";
 import { OwnRecipeForm } from "@/components/OwnRecipeForm";
 import { RecipeFacts, RecipePhoto } from "@/components/RecipeFacts";
@@ -105,10 +106,15 @@ export function PlanBuilder({
     return (
       <>
         <FinalWeek
+          // A changed dish remounts it, so the budget line reloads the list.
+          key={week.items.map((i) => i.id).join("-")}
           week={week}
           targets={targets}
           weekLabel={weekLabel(weekStart)}
           budgetCents={budgetCents}
+          renderChange={(item) => (
+            <ChangeDish week={week} slot={item.slot} onChange={setWeek} />
+          )}
         />
         <section className="card">
           <StartOver week={week} onReset={startedOver} />
