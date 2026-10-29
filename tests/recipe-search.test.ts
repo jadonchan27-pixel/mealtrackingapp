@@ -397,7 +397,7 @@ describe("searchQuery", () => {
   });
 });
 
-// Step 20f (TR-27): simple-recipe searches under an ingredient limit or cap.
+// Step 20f (TR-28): simple-recipe searches under an ingredient limit or cap.
 describe("simple-recipe searches", () => {
   it("asks for easy, few-ingredient and cheap recipes", () => {
     expect(simplePrefix()).toBeNull();

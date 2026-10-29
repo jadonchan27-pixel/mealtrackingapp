@@ -79,7 +79,7 @@ export function searchQuery(
     .join(" ");
 }
 
-// TR-27: with an ingredient limit or a cost cap, each search first asks for
+// TR-28: with an ingredient limit or a cost cap, each search first asks for
 // simple recipes ("easy 5 ingredient", "cheap easy few ingredient"), since
 // most ordinary recipes have too many ingredients and are dropped after
 // they're read.
@@ -98,7 +98,7 @@ export function simplePrefix({ maxIngredients, cheap }: SimpleSearch = {}):
 }
 
 // One search per cuisine (or one with none) and protein of the week; under
-// TR-27 each is preceded by its simple-recipe search.
+// TR-28 each is preceded by its simple-recipe search.
 export function searchQueries(
   slot: MealSlot,
   cuisines: readonly string[] = [],
