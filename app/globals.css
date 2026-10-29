@@ -821,3 +821,26 @@ button:disabled {
   min-height: 44px;
   margin-top: 8px;
 }
+
+/* US-35: own recipe form under each dish */
+.own-recipe {
+  margin-top: 12px;
+}
+.own-recipe summary {
+  min-height: 44px;
+  display: flex;
+  align-items: center;
+  cursor: pointer;
+  font-weight: 600;
+}
+.own-recipe form {
+  display: grid;
+  gap: 8px;
+}
+.own-recipe textarea {
+  width: 100%;
+  font: inherit;
+}
+.own-recipe button[type="submit"] {
+  min-height: 44px;
+}

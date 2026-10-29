@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useState } from "react";
 import { FinalWeek, type DailyTargets } from "@/components/FinalWeek";
+import { OwnRecipeForm } from "@/components/OwnRecipeForm";
 import { RecipeFacts, RecipePhoto } from "@/components/RecipeFacts";
 import type { MealSlot } from "@/lib/db/types";
 import type { CandidateView, WeekView } from "@/lib/plans";
@@ -484,6 +485,14 @@ function Shortlist({
           busy={searching}
           onSearch={() => search(slot, week)}
           onPicked={(candidates) => setSlot(slot, candidates)}
+          ownRecipe={
+            <OwnRecipeForm
+              weekId={week.id}
+              slot={slot}
+              disabled={searching}
+              onSaved={onChange}
+            />
+          }
         />
       ))}
     </>
@@ -499,6 +508,7 @@ function SlotSection({
   busy,
   onSearch,
   onPicked,
+  ownRecipe,
 }: {
   slot: MealSlot;
   candidates: CandidateView[];
@@ -509,6 +519,8 @@ function SlotSection({
   busy: boolean;
   onSearch: () => void;
   onPicked: (candidates: CandidateView[]) => void;
+  // US-35: the form for Jadon's own recipe.
+  ownRecipe?: React.ReactNode;
 }) {
   const [pickError, setPickError] = useState<string | null>(null);
   const [picking, setPicking] = useState<number | null>(null);
@@ -634,6 +646,7 @@ function SlotSection({
           {showAll ? "Show the top 3" : `Show all ${pickable.length} options`}
         </button>
       )}
+      {ownRecipe}
     </section>
   );
 }

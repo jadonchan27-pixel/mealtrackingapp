@@ -64,6 +64,8 @@ On finalize:
 4. Map each food to an `heb_products` row; packages = ceil(needed ÷ package size). Foods with no product get an estimated row flagged `is_estimate`.
 5. Write `shopping_list_items` with section, packages, price and batch flag. The total is the sum of item prices.
 
+Changing a dish after finalize (TR-30): a new `plan_items` row for the slot (the newest per slot is the current one), portions scaled again, today-onward `planned` entries rewritten, and the shopping list rebuilt from the current items.
+
 Price correction: when Jadon enters the actual price paid on an item, the `heb_products` row is updated (`is_estimate = false`), so later weeks use real prices.
 
 ### Daily log (TR-18)
@@ -231,6 +233,8 @@ Next.js route handlers under `/api`. All require the signed-in allowed user (TR-
 | GET | `/api/weeks/:weekStart` | Plan with candidates or items | US-10, US-11 |
 | POST | `/api/weeks/:id/candidates` | Run search for one slot `{ slot }` | US-8, US-9 |
 | PATCH | `/api/candidates/:id` | Select a candidate | US-10 |
+| POST | `/api/weeks/:id/custom-recipe` | Add Jadon's own recipe to a slot `{ slot, title, servings, kcal, proteinG, carbsG, fatG, ingredients?, steps?, sourceUrl?, activeMinutes?, costPerServing? }` and pick it (on a finalized week, change the dish to it) | US-35, US-36 |
+| POST | `/api/weeks/:id/change` | Change a finalized dish to a candidate `{ candidateId }` | US-36 |
 | POST | `/api/weeks/:id/finalize` | Build plan items, log entries and shopping list | US-10 to US-15 |
 | GET | `/api/weeks/:id/batches` | Batch cooking quantities | US-12 |
 | POST | `/api/weeks/:id/reset` | Start the week over: delete its plan so cuisines can be chosen again | US-29 |

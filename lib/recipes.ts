@@ -89,10 +89,23 @@ export async function saveRecipeFromUrl({
     .single();
   if (saved.error) throw new Error(saved.error.message);
   const recipe = saved.data;
+  await saveIngredients(supabase, recipe.id, items, owner);
+  return { status: "saved", recipe, missing };
+}
 
-  // Every ingredient line is kept; lines that couldn't be parsed or matched
-  // have no food or grams, so they can be shown to Jadon. Blank lines and
-  // headings ("For the sauce:") aren't ingredients.
+type IngredientItems = Awaited<ReturnType<typeof nutritionForRecipe>>["items"];
+
+// Stores a saved recipe's ingredient lines. Every line is kept; lines that
+// couldn't be parsed or matched have no food or grams, so they can be shown
+// to Jadon. Blank lines and headings ("For the sauce:") aren't ingredients.
+// On failure the recipe is deleted too, so none is left without them.
+export async function saveIngredients(
+  supabase: SupabaseClient<Database>,
+  recipeId: number,
+  items: IngredientItems,
+  owner: { user_id?: string } = {},
+): Promise<void> {
+  const recipe = { id: recipeId };
   const rows: Omit<
     RecipeIngredientRow,
     "id" | "created_at" | "updated_at" | "user_id"
@@ -131,5 +144,4 @@ export async function saveRecipeFromUrl({
       throw new Error(inserted.error.message);
     }
   }
-  return { status: "saved", recipe, missing };
 }

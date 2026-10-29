@@ -2,6 +2,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { Suspense } from "react";
 import { RecipeFacts, RecipePhoto } from "@/components/RecipeFacts";
+import { isCustomSource } from "@/lib/customRecipe";
 import { createClient } from "@/lib/db/server";
 import { loadRecipe } from "@/lib/plans";
 
@@ -61,7 +62,7 @@ async function Recipe({ params }: { params: Promise<{ id: string }> }) {
       <section>
         <h2>Steps</h2>
         {recipe.steps.length === 0 ? (
-          <p className="muted">The recipe page didn&apos;t list its steps.</p>
+          <p className="muted">No steps listed.</p>
         ) : (
           <ol className="recipe-steps">
             {recipe.steps.map((step, i) => (
@@ -70,11 +71,15 @@ async function Recipe({ params }: { params: Promise<{ id: string }> }) {
           </ol>
         )}
       </section>
-      <p>
-        <a href={recipe.sourceUrl} target="_blank" rel="noreferrer">
-          Original recipe ↗
-        </a>
-      </p>
+      {isCustomSource(recipe.sourceUrl) ? (
+        <p className="muted">Your own recipe.</p>
+      ) : (
+        <p>
+          <a href={recipe.sourceUrl} target="_blank" rel="noreferrer">
+            Original recipe ↗
+          </a>
+        </p>
+      )}
     </article>
   );
 }

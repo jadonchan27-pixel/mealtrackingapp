@@ -217,10 +217,23 @@ Status: ☐ not started · ◐ in progress · ☑ done and validated
 
 **Done when:** under a cap, a slot search's candidates are every recipe left after the other filters, in-cap ones first in rank order, then over-cap ones cheapest first.
 
-### ◐ Step 20f. Search for simple recipes (US-34, TR-28)
+### ☑ Step 20f. Search for simple recipes (US-34, TR-28)
 1. With a max ingredients or a max cost per meal on the profile, each slot search runs a "cheap easy few ingredient" (or "easy 5 ingredient") version of each cuisine-and-protein search before the plain one.
 
 **Done when:** with a max of 10 ingredients and a cost cap, a slot search's Brave queries alternate "cheap easy few ingredient … recipe" and the plain query for each protein, and with neither set they are unchanged.
+
+### ◐ Step 20g. Own recipe (US-35, TR-29)
+1. `POST /api/weeks/:id/custom-recipe` saves Jadon's recipe with his nutrition, parses and matches its ingredients, prices it, and adds it to the slot's candidates as the pick.
+2. Plan page: "Add my own recipe" under each dish, with name, servings, calories, protein, carbs and fat per serving, and optional ingredients, steps, link, cook time and cost.
+
+**Done when:** an own recipe added to a draft week's slot is that slot's selected candidate with the entered nutrition, and finalizing uses it.
+
+### ◐ Step 20h. Change a dish after finalizing (US-36, TR-30)
+1. `POST /api/weeks/:id/change { candidateId }`: new plan item, portions rescaled, today-to-Saturday planned entries rewritten, shopping list rebuilt.
+2. Own recipe on a finalized week changes the dish to it.
+3. Finalized week on the Plan page: "Change" on each dish opens its shortlist and the own-recipe form.
+
+**Done when:** changing a finalized week's dish mid-week leaves earlier days' entries on the old dish and gives today onward the new one at rescaled portions, with the shopping list built from the new dishes.
 
 ---
 

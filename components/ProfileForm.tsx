@@ -282,8 +282,8 @@ export function ProfileForm({
             aria-invalid={!!errors.maxMealCost}
           />
           <p className="muted field-hint">
-            For the portion you&apos;ll eat. Recipe search leaves out dishes
-            over this, unless too few fit. Leave blank for no limit.
+            For the portion you&apos;ll eat. Recipe search lists dishes over
+            this last, marked how far over. Leave blank for no limit.
           </p>
           {errors.maxMealCost && (
             <p className="field-error">{errors.maxMealCost}</p>
