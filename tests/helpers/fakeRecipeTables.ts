@@ -29,7 +29,7 @@ const DEFAULTS: Partial<Record<(typeof TABLES)[number], Row>> = {
 
 // An in-memory stand-in for the recipe tables (and the tables recipe search
 // reads) that supports the queries the app makes: select with eq/in filters,
-// order, insert (optionally returning the row), update and delete.
+// order, limit, insert (optionally returning the row), update and delete.
 export function fakeRecipeTables({
   failIngredientInsert = false,
   seed = {},
@@ -51,7 +51,9 @@ export function fakeRecipeTables({
       let changes: Row = {};
       let error: Result["error"] = null;
       let sortBy: { column: string; ascending: boolean } | null = null;
-      const matches = () => {
+      let maxRows = Infinity;
+      const matches = () => sorted().slice(0, maxRows);
+      const sorted = () => {
         const rows = tables[table].filter((r) => filters.every((f) => f(r)));
         if (!sortBy) return rows;
         const { column, ascending } = sortBy;
@@ -74,6 +76,10 @@ export function fakeRecipeTables({
         },
         order(column: string, { ascending = true } = {}) {
           sortBy = { column, ascending };
+          return builder;
+        },
+        limit(n: number) {
+          maxRows = n;
           return builder;
         },
         insert(rows: Row | Row[]) {

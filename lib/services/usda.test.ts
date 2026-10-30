@@ -1,4 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
+import bigMac from "@/tests/fixtures/usda/big-mac-search.json";
+import bigMacLegacy from "@/tests/fixtures/usda/big-mac-sr-legacy.json";
 import egg from "@/tests/fixtures/usda/egg-sr-legacy.json";
 import rice from "@/tests/fixtures/usda/rice-foundation.json";
 import {
@@ -478,6 +480,57 @@ describe("createUsdaClient", () => {
     vi.stubEnv("USDA_API_KEY", "from-env");
     expect(usdaApiKey()).toBe("from-env");
     vi.unstubAllEnvs();
+  });
+});
+
+describe("searchDishes", () => {
+  it("posts the search and adds SR Legacy portions", async () => {
+    const fetch = vi
+      .fn()
+      .mockResolvedValueOnce(jsonResponse(structuredClone(bigMac)))
+      .mockResolvedValueOnce(jsonResponse(bigMacLegacy));
+    const usda = createUsdaClient({ apiKey: "k", fetch });
+    const foods = await usda.searchDishes("big mac");
+
+    const [url, init] = fetch.mock.calls[0];
+    expect(new URL(url).pathname).toBe("/fdc/v1/foods/search");
+    expect(new URL(url).searchParams.get("api_key")).toBe("k");
+    expect(init.method).toBe("POST");
+    expect(JSON.parse(init.body)).toEqual({
+      query: "big mac",
+      dataType: ["SR Legacy", "Survey (FNDDS)", "Branded"],
+      pageSize: 15,
+    });
+    // Only the SR Legacy food without portions is read in full.
+    expect(fetch).toHaveBeenCalledTimes(2);
+    expect(new URL(fetch.mock.calls[1][0]).pathname).toBe(
+      "/fdc/v1/food/170720",
+    );
+    expect(foods.map((f) => f.fdcId)).toEqual([
+      170720, 2705900, 2706000, 2001234, 9999999,
+    ]);
+    expect(foods[0].foodMeasures).toEqual([
+      { disseminationText: "1 item", gramWeight: 219 },
+    ]);
+  });
+
+  it("keeps a food per 100 g when its portions can't be read", async () => {
+    const fetch = vi
+      .fn()
+      .mockResolvedValueOnce(jsonResponse(structuredClone(bigMac)))
+      .mockResolvedValueOnce(jsonResponse({}, 500));
+    vi.spyOn(console, "error").mockImplementation(() => {});
+    const usda = createUsdaClient({ apiKey: "k", fetch });
+    const foods = await usda.searchDishes("big mac");
+    expect(foods[0].foodMeasures).toEqual([]);
+  });
+
+  it("throws when USDA is down", async () => {
+    const fetch = vi.fn().mockResolvedValue(jsonResponse({}, 503));
+    const usda = createUsdaClient({ apiKey: "k", fetch });
+    await expect(usda.searchDishes("big mac")).rejects.toBeInstanceOf(
+      UsdaError,
+    );
   });
 });
 

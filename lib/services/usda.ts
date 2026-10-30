@@ -67,11 +67,9 @@ export function createUsdaClient(options: UsdaClientOptions = {}) {
   const doFetch = options.fetch ?? fetch;
   const apiKey = () => options.apiKey ?? usdaApiKey();
 
-  async function get(path: string, params: Record<string, string> = {}) {
-    const url = new URL(`${BASE_URL}${path}`);
-    for (const [k, v] of Object.entries(params)) url.searchParams.set(k, v);
+  async function request(url: URL, init?: RequestInit) {
     url.searchParams.set("api_key", apiKey());
-    const res = await doFetch(url);
+    const res = await doFetch(url, init);
     if (!res.ok) {
       throw new UsdaError(
         `USDA request failed: ${res.status} ${res.statusText}`,
@@ -79,6 +77,22 @@ export function createUsdaClient(options: UsdaClientOptions = {}) {
       );
     }
     return (await res.json()) as unknown;
+  }
+
+  async function get(path: string, params: Record<string, string> = {}) {
+    const url = new URL(`${BASE_URL}${path}`);
+    for (const [k, v] of Object.entries(params)) url.searchParams.set(k, v);
+    return request(url);
+  }
+
+  // USDA often answers a GET whose dataType includes "Survey (FNDDS)" with a
+  // 400; the same search as a POST works.
+  async function post(path: string, body: unknown) {
+    return request(new URL(`${BASE_URL}${path}`), {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+    });
   }
 
   // The best matching food's id, or null when USDA has nothing for the name.
@@ -185,8 +199,71 @@ export function createUsdaClient(options: UsdaClientOptions = {}) {
     return sameFood === null ? food : withPortionsFrom(food, sameFood);
   }
 
-  return { search, getFood, findFood };
+  // Eat-out search (TR-31): USDA's own order, with each food's nutrients
+  // and portions. SR Legacy results come back without portions, so the
+  // first few are read in full for theirs ("1 item" of a Big Mac).
+  async function searchDishes(query: string): Promise<DishResult[]> {
+    const json = (await post("/foods/search", {
+      query,
+      dataType: DISH_DATA_TYPES,
+      pageSize: 15,
+    })) as { foods?: DishResult[] };
+    const foods = json.foods ?? [];
+    const bare = foods
+      .filter((f) => f.dataType === "SR Legacy" && !f.foodMeasures?.length)
+      .slice(0, MAX_PORTION_FETCHES);
+    await Promise.all(
+      bare.map(async (food) => {
+        try {
+          const details = (await get(`/food/${food.fdcId}`)) as FoodDetails;
+          food.foodMeasures = portionMeasures(details);
+        } catch (err) {
+          // Without its portions the food is shown per 100 g.
+          console.error(`USDA portions for ${food.fdcId} failed`, err);
+        }
+      }),
+    );
+    return foods;
+  }
+
+  return { search, getFood, findFood, searchDishes };
 }
+
+// SR Legacy lists chain items ("McDONALD'S, BIG MAC"), FNDDS generic dishes
+// ("Burrito with chicken") and Branded packaged and some restaurant foods.
+const DISH_DATA_TYPES = ["SR Legacy", "Survey (FNDDS)", "Branded"];
+const MAX_PORTION_FETCHES = 4;
+
+// A full record's portions in the search results' shape: "1 item".
+export function portionMeasures(
+  details: FoodDetails,
+): NonNullable<DishResult["foodMeasures"]> {
+  return (details.foodPortions ?? []).flatMap((p) => {
+    const unit =
+      p.modifier?.trim() ||
+      p.portionDescription?.trim() ||
+      p.measureUnit?.name?.trim();
+    if (!unit || !p.gramWeight || unit === "undetermined") return [];
+    const amount = p.amount && p.amount > 0 ? `${p.amount} ` : "";
+    return [
+      { disseminationText: `${amount}${unit}`, gramWeight: p.gramWeight },
+    ];
+  });
+}
+
+// A /foods/search result. Nutrient values are per 100 g.
+export type DishResult = {
+  fdcId: number;
+  description: string;
+  dataType?: string;
+  brandName?: string;
+  brandOwner?: string;
+  servingSize?: number;
+  servingSizeUnit?: string;
+  householdServingFullText?: string;
+  foodNutrients?: { nutrientId?: number; value?: number }[];
+  foodMeasures?: { disseminationText?: string; gramWeight?: number }[];
+};
 
 export type UsdaClient = ReturnType<typeof createUsdaClient>;
 

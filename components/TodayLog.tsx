@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useState } from "react";
 import { servingsLabel, type DailyTargets } from "@/components/FinalWeek";
+import { ItemSearch } from "@/components/ItemSearch";
 import { RecipePhoto } from "@/components/RecipeFacts";
 import {
   confirmedTotals,
@@ -13,6 +14,7 @@ import {
   type LogPatch,
   type Nutrition,
 } from "@/lib/log";
+import type { ItemResult } from "@/lib/restaurantSearch";
 import type { MealSlot } from "@/lib/db/types";
 import { MEAL_SLOTS, SLOT_LABELS } from "@/lib/weeks";
 
@@ -401,6 +403,26 @@ function EatOutForm({
   });
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [filled, setFilled] = useState<string | null>(null);
+
+  // US-37: a search result fills the form; every field stays editable.
+  function pick(found: ItemResult) {
+    setItem(found.itemName);
+    if (
+      found.restaurantName &&
+      (found.source === "past" || restaurant === "")
+    ) {
+      setRestaurant(found.restaurantName);
+    }
+    setValues({
+      kcal: String(found.kcal),
+      proteinG: String(found.proteinG),
+      carbsG: String(found.carbsG),
+      fatG: String(found.fatG),
+    });
+    setFilled(found.portion);
+    setError(null);
+  }
 
   async function submit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -469,6 +491,7 @@ function EatOutForm({
           </select>
         </label>
       )}
+      <ItemSearch onPick={pick} />
       <label className="field">
         <span>Restaurant</span>
         <input
@@ -500,7 +523,9 @@ function EatOutForm({
         </select>
       </label>
       <p className="field-hint">
-        Calories and macros for the whole item, as the menu lists them.
+        {filled
+          ? `Filled in for ${filled}. Change any number if it looks off.`
+          : "Calories and macros for the whole item, as the menu lists them."}
       </p>
       <div className="eat-out-numbers">
         {field("kcal", "Calories")}

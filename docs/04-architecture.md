@@ -245,6 +245,7 @@ Next.js route handlers under `/api`. All require the signed-in allowed user (TR-
 | PATCH | `/api/log/:id` | `{ status, portion }` | US-21, US-22 |
 | POST | `/api/log/restaurant` | Replace a slot with a restaurant item | US-24, US-25 |
 | DELETE | `/api/log/:id` | Remove a restaurant item; the planned meal comes back | US-24 |
+| GET | `/api/restaurant-items?q=` | Search past eat-outs, then USDA, for an item's nutrition | US-37 |
 | GET | `/api/weights` | Weight entries and trend | US-27 |
 | POST | `/api/weights` | Log a weight | US-26 |
 
