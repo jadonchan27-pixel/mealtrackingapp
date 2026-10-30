@@ -1,4 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
+import bigMac from "@/tests/fixtures/usda/big-mac-search.json";
 import egg from "@/tests/fixtures/usda/egg-sr-legacy.json";
 import rice from "@/tests/fixtures/usda/rice-foundation.json";
 import {
@@ -478,6 +479,28 @@ describe("createUsdaClient", () => {
     vi.stubEnv("USDA_API_KEY", "from-env");
     expect(usdaApiKey()).toBe("from-env");
     vi.unstubAllEnvs();
+  });
+});
+
+describe("searchDishes", () => {
+  it("searches chain, survey and branded foods in USDA's order", async () => {
+    const fetch = vi.fn().mockResolvedValue(jsonResponse(bigMac));
+    const usda = createUsdaClient({ apiKey: "k", fetch });
+    const foods = await usda.searchDishes("big mac");
+    expect(foods.map((f) => f.fdcId)).toEqual([170720, 2001234, 9999999]);
+    const url = new URL(fetch.mock.calls[0][0]);
+    expect(url.searchParams.get("query")).toBe("big mac");
+    expect(url.searchParams.get("dataType")).toBe(
+      "SR Legacy,Survey (FNDDS),Branded",
+    );
+  });
+
+  it("throws when USDA is down", async () => {
+    const fetch = vi.fn().mockResolvedValue(jsonResponse({}, 503));
+    const usda = createUsdaClient({ apiKey: "k", fetch });
+    await expect(usda.searchDishes("big mac")).rejects.toBeInstanceOf(
+      UsdaError,
+    );
   });
 });
 

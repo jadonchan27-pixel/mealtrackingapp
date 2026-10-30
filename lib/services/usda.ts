@@ -185,8 +185,37 @@ export function createUsdaClient(options: UsdaClientOptions = {}) {
     return sameFood === null ? food : withPortionsFrom(food, sameFood);
   }
 
-  return { search, getFood, findFood };
+  // Eat-out search (TR-31): USDA's own order, with each food's nutrients
+  // and portions as the search returns them.
+  async function searchDishes(query: string): Promise<DishResult[]> {
+    const json = (await get("/foods/search", {
+      query,
+      dataType: DISH_DATA_TYPES.join(","),
+      pageSize: "15",
+    })) as { foods?: DishResult[] };
+    return json.foods ?? [];
+  }
+
+  return { search, getFood, findFood, searchDishes };
 }
+
+// SR Legacy lists chain items ("McDONALD'S, BIG MAC"), FNDDS generic dishes
+// ("Burrito with chicken") and Branded packaged and some restaurant foods.
+const DISH_DATA_TYPES = ["SR Legacy", "Survey (FNDDS)", "Branded"];
+
+// A /foods/search result. Nutrient values are per 100 g.
+export type DishResult = {
+  fdcId: number;
+  description: string;
+  dataType?: string;
+  brandName?: string;
+  brandOwner?: string;
+  servingSize?: number;
+  servingSizeUnit?: string;
+  householdServingFullText?: string;
+  foodNutrients?: { nutrientId?: number; value?: number }[];
+  foodMeasures?: { disseminationText?: string; gramWeight?: number }[];
+};
 
 export type UsdaClient = ReturnType<typeof createUsdaClient>;
 

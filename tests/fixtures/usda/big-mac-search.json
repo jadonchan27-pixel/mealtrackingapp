@@ -1,0 +1,62 @@
+{
+  "totalHits": 3,
+  "foods": [
+    {
+      "fdcId": 170720,
+      "description": "McDONALD'S, BIG MAC",
+      "dataType": "SR Legacy",
+      "foodNutrients": [
+        {
+          "nutrientId": 1003,
+          "nutrientNumber": "203",
+          "unitName": "G",
+          "value": 11.8
+        },
+        {
+          "nutrientId": 1004,
+          "nutrientNumber": "204",
+          "unitName": "G",
+          "value": 15
+        },
+        {
+          "nutrientId": 1005,
+          "nutrientNumber": "205",
+          "unitName": "G",
+          "value": 20.1
+        },
+        {
+          "nutrientId": 1008,
+          "nutrientNumber": "208",
+          "unitName": "KCAL",
+          "value": 257
+        }
+      ],
+      "foodMeasures": [
+        { "disseminationText": "Quantity not specified", "gramWeight": 100 },
+        { "disseminationText": "1 item", "gramWeight": 219 }
+      ]
+    },
+    {
+      "fdcId": 2001234,
+      "description": "BIG MAC SAUCE",
+      "dataType": "Branded",
+      "brandOwner": "McDonald's",
+      "servingSize": 30,
+      "servingSizeUnit": "GRM",
+      "householdServingFullText": "2 Tbsp",
+      "foodNutrients": [
+        { "nutrientId": 1003, "value": 0 },
+        { "nutrientId": 1004, "value": 50 },
+        { "nutrientId": 1005, "value": 13.3 },
+        { "nutrientId": 1008, "value": 500 }
+      ]
+    },
+    {
+      "fdcId": 9999999,
+      "description": "Hamburger, no energy listed",
+      "dataType": "Survey (FNDDS)",
+      "foodNutrients": [{ "nutrientId": 1003, "value": 12 }],
+      "foodMeasures": []
+    }
+  ]
+}
