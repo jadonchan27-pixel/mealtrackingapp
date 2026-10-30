@@ -42,7 +42,8 @@ describe("GET /api/restaurant-items", () => {
     expect(json.usdaError).toBeNull();
     expect(json.items[0]).toMatchObject({
       itemName: "McDONALD'S, BIG MAC",
-      kcal: 563,
+      portion: "100 g",
+      kcal: 257,
     });
   });
 

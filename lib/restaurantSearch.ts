@@ -87,26 +87,42 @@ function per100g(food: DishResult, ids: readonly number[]): number | null {
 
 const GRAM_UNITS = new Set(["g", "grm", "ml", "mlt"]);
 
-// The portion the numbers are for: the first measure with a weight, else a
-// branded serving in grams or ml, else 100 g.
+// Measures that are a fraction of a restaurant serving.
+const SMALL_MEASURE =
+  /\b(cups?|oz|ounces?|fl|tbsps?|tablespoons?|tsps?|teaspoons?|miniatures?|mini|bites?|pieces?|slices?|grams?|g)\b/i;
+
+// How well a measure stands for one restaurant serving: "1 item", "1 Big
+// Mac" best, then FNDDS's "Quantity not specified" (a typical serving), then
+// other whole-thing measures, and cups or miniatures last.
+function measureScore(text: string): number {
+  if (/not specified/i.test(text)) return 2;
+  if (SMALL_MEASURE.test(text)) return 0;
+  return /^1 /.test(text) ? 3 : 1;
+}
+
+// The portion the numbers are for: the measure that best stands for one
+// serving, else a branded serving in grams or ml, else 100 g.
 export function dishPortion(food: DishResult): {
   label: string;
   grams: number;
 } {
-  const measure = food.foodMeasures?.find(
-    (m) =>
-      typeof m.gramWeight === "number" &&
-      m.gramWeight > 0 &&
-      m.disseminationText &&
-      !/not specified/i.test(m.disseminationText),
-  );
-  if (measure) {
-    const grams = measure.gramWeight!;
-    return {
-      label: `${measure.disseminationText} (${Math.round(grams)} g)`,
-      grams,
-    };
+  let best: { label: string; grams: number; score: number } | null = null;
+  for (const m of food.foodMeasures ?? []) {
+    const text = m.disseminationText?.trim();
+    if (!text || typeof m.gramWeight !== "number" || m.gramWeight <= 0) {
+      continue;
+    }
+    const score = measureScore(text);
+    if (best === null || score > best.score) {
+      const name = score === 2 ? "1 serving" : text;
+      best = {
+        label: `${name} (${Math.round(m.gramWeight)} g)`,
+        grams: m.gramWeight,
+        score,
+      };
+    }
   }
+  if (best) return { label: best.label, grams: best.grams };
   const unit = food.servingSizeUnit?.toLowerCase();
   if (
     food.servingSize &&
@@ -150,7 +166,14 @@ export async function searchItems(
 ): Promise<ItemSearch> {
   const past = await pastItems(supabase, query);
   try {
-    const dishes = (await usda.searchDishes(query))
+    const wanted = words(query);
+    // USDA's order, with foods named by every word of the query first.
+    const named = (d: DishResult) => {
+      const have = words(`${d.brandName ?? ""} ${d.description}`);
+      return wanted.every((w) => have.some((h) => h.startsWith(w)));
+    };
+    const found = await usda.searchDishes(query);
+    const dishes = [...found.filter(named), ...found.filter((d) => !named(d))]
       .map(dishItem)
       .filter((d): d is ItemResult => d !== null);
     return { items: [...past, ...dishes], usdaError: null };

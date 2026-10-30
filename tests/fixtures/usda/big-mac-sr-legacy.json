@@ -1,0 +1,23 @@
+{
+  "fdcId": 170720,
+  "description": "McDONALD'S, BIG MAC",
+  "foodPortions": [
+    {
+      "amount": 1,
+      "modifier": "item",
+      "gramWeight": 219,
+      "measureUnit": {
+        "name": "undetermined"
+      }
+    },
+    {
+      "amount": 1,
+      "modifier": "",
+      "portionDescription": "",
+      "gramWeight": 0,
+      "measureUnit": {
+        "name": "undetermined"
+      }
+    }
+  ]
+}

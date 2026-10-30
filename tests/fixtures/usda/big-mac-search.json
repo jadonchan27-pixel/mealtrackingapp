@@ -1,5 +1,5 @@
 {
-  "totalHits": 3,
+  "totalHits": 5,
   "foods": [
     {
       "fdcId": 170720,
@@ -31,9 +31,76 @@
           "value": 257
         }
       ],
+      "foodMeasures": []
+    },
+    {
+      "fdcId": 2705900,
+      "description": "Big Mac (McDonalds)",
+      "dataType": "Survey (FNDDS)",
+      "foodNutrients": [
+        {
+          "nutrientId": 1003,
+          "value": 11.7
+        },
+        {
+          "nutrientId": 1004,
+          "value": 14.1
+        },
+        {
+          "nutrientId": 1005,
+          "value": 21.5
+        },
+        {
+          "nutrientId": 1008,
+          "value": 261
+        }
+      ],
       "foodMeasures": [
-        { "disseminationText": "Quantity not specified", "gramWeight": 100 },
-        { "disseminationText": "1 item", "gramWeight": 219 }
+        {
+          "disseminationText": "Quantity not specified",
+          "gramWeight": 205
+        },
+        {
+          "disseminationText": "1 McDonald's Big Mac",
+          "gramWeight": 205
+        }
+      ]
+    },
+    {
+      "fdcId": 2706000,
+      "description": "Burrito, chicken, cheese",
+      "dataType": "Survey (FNDDS)",
+      "foodNutrients": [
+        {
+          "nutrientId": 1003,
+          "value": 11
+        },
+        {
+          "nutrientId": 1004,
+          "value": 9
+        },
+        {
+          "nutrientId": 1005,
+          "value": 27
+        },
+        {
+          "nutrientId": 1008,
+          "value": 244
+        }
+      ],
+      "foodMeasures": [
+        {
+          "disseminationText": "1 miniature",
+          "gramWeight": 110
+        },
+        {
+          "disseminationText": "1 cup",
+          "gramWeight": 120
+        },
+        {
+          "disseminationText": "Quantity not specified",
+          "gramWeight": 220
+        }
       ]
     },
     {
@@ -45,17 +112,34 @@
       "servingSizeUnit": "GRM",
       "householdServingFullText": "2 Tbsp",
       "foodNutrients": [
-        { "nutrientId": 1003, "value": 0 },
-        { "nutrientId": 1004, "value": 50 },
-        { "nutrientId": 1005, "value": 13.3 },
-        { "nutrientId": 1008, "value": 500 }
+        {
+          "nutrientId": 1003,
+          "value": 0
+        },
+        {
+          "nutrientId": 1004,
+          "value": 50
+        },
+        {
+          "nutrientId": 1005,
+          "value": 13.3
+        },
+        {
+          "nutrientId": 1008,
+          "value": 500
+        }
       ]
     },
     {
       "fdcId": 9999999,
       "description": "Hamburger, no energy listed",
       "dataType": "Survey (FNDDS)",
-      "foodNutrients": [{ "nutrientId": 1003, "value": 12 }],
+      "foodNutrients": [
+        {
+          "nutrientId": 1003,
+          "value": 12
+        }
+      ],
       "foodMeasures": []
     }
   ]

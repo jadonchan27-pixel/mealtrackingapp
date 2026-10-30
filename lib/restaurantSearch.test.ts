@@ -29,9 +29,16 @@ function eatOut(
   };
 }
 
+const food = (id: number) => foods.find((f) => f.fdcId === id)!;
+
 describe("dishItem", () => {
   it("gives a chain item's numbers for one item", () => {
-    expect(dishItem(foods[0])).toEqual({
+    // SR Legacy portions, as searchDishes adds them from the full record.
+    const bigMac = {
+      ...food(170720),
+      foodMeasures: [{ disseminationText: "1 item", gramWeight: 219 }],
+    };
+    expect(dishItem(bigMac)).toEqual({
       source: "usda",
       key: "usda:170720",
       itemName: "McDONALD'S, BIG MAC",
@@ -44,8 +51,29 @@ describe("dishItem", () => {
     });
   });
 
+  it("prefers one whole item to a typical serving, and either to cups", () => {
+    expect(dishItem(food(2705900))).toMatchObject({
+      portion: "1 McDonald's Big Mac (205 g)",
+      kcal: 535,
+    });
+    // A cup or a miniature burrito is about half of one.
+    expect(dishItem(food(2706000))).toMatchObject({
+      portion: "1 serving (220 g)",
+      kcal: 537,
+    });
+    expect(
+      dishItem({
+        ...food(2706000),
+        foodMeasures: [
+          { disseminationText: "1 cup", gramWeight: 120 },
+          { disseminationText: "1 miniature", gramWeight: 110 },
+        ],
+      })?.portion,
+    ).toBe("1 cup (120 g)");
+  });
+
   it("uses a branded serving and names the brand", () => {
-    expect(dishItem(foods[1])).toMatchObject({
+    expect(dishItem(food(2001234))).toMatchObject({
       restaurantName: "McDonald's",
       portion: "2 Tbsp (30 g)",
       kcal: 150,
@@ -54,8 +82,8 @@ describe("dishItem", () => {
   });
 
   it("falls back to 100 g and drops foods without calories", () => {
-    expect(dishItem({ ...foods[0], foodMeasures: [] })?.portion).toBe("100 g");
-    expect(dishItem(foods[2])).toBeNull();
+    expect(dishItem(food(170720))?.portion).toBe("100 g");
+    expect(dishItem(food(9999999))).toBeNull();
   });
 });
 
@@ -97,10 +125,13 @@ describe("searchItems", () => {
     const result = await searchItems(db.client, usda, "big mac");
     expect(usda.searchDishes).toHaveBeenCalledWith("big mac");
     expect(result.usdaError).toBeNull();
+    // Past items, then foods named by every query word, then the rest.
     expect(result.items.map((i) => i.key)).toEqual([
       "past:1",
       "usda:170720",
+      "usda:2705900",
       "usda:2001234",
+      "usda:2706000",
     ]);
   });
 
