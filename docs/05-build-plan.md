@@ -236,12 +236,18 @@ Status: ☐ not started · ◐ in progress · ☑ done and validated
 
 **Done when:** changing a finalized week's dish mid-week leaves earlier days' entries on the old dish and gives today onward the new one at rescaled portions, with the shopping list built from the new dishes.
 
-### ◐ Step 20i. Eat-out search (US-37, TR-31)
+### ☑ Step 20i. Eat-out search (US-37, TR-31)
 1. `lib/restaurantSearch.ts`: past restaurant entries matching the query, and USDA results with nutrition for one portion.
 2. `GET /api/restaurant-items?q=`.
 3. Today's eat-out form: a search box above the fields; picking a result fills the item name (and restaurant, for a past item) and the calories and macros, which stay editable.
 
 **Done when:** searching "big mac" lists USDA's McDonald's Big Mac with its calories and macros for one sandwich, tapping it fills the form, and an item logged before shows first next time.
+
+### ◐ Step 20j. High-protein search (US-38, TR-11, TR-32)
+1. Every recipe search query starts with "high protein".
+2. Ranking weights: cost 0.4, protein 0.4, cuisine 0.2.
+
+**Done when:** a slot search sends only "high protein …" queries, and of two recipes alike in cost and cuisine, the one with more protein per 100 kcal ranks first.
 
 ---
 
