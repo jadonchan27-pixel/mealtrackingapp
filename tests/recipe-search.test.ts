@@ -151,23 +151,24 @@ describe("findTopRecipes", () => {
 
     // Each of the week's 3 proteins; page 1 has under 14 links, so page 2 too.
     expect(brave.search.mock.calls).toEqual([
-      ["Indian chicken dinner recipe", 20, 0],
-      ["Indian chicken dinner recipe", 20, 1],
-      ["Indian beef dinner recipe", 20, 0],
-      ["Indian beef dinner recipe", 20, 1],
-      ["Indian pork dinner recipe", 20, 0],
-      ["Indian pork dinner recipe", 20, 1],
+      ["high protein Indian chicken dinner recipe", 20, 0],
+      ["high protein Indian chicken dinner recipe", 20, 1],
+      ["high protein Indian beef dinner recipe", 20, 0],
+      ["high protein Indian beef dinner recipe", 20, 1],
+      ["high protein Indian pork dinner recipe", 20, 0],
+      ["high protein Indian pork dinner recipe", 20, 1],
     ]);
     // Per serving (protein per 100 kcal, cost):
     //   Tandoori 430 kcal, 13.7 g, $2.70   Dal    362 kcal, 5.7 g, $0.80
     //   Paneer   610 kcal,  5.4 g, $2.45   Pasta  360 kcal, 18.8 g, $3.00
-    // Scores: Dal 0.3 + 0.3 × 0.03 + 0.4 × 1 = 0.708; Tandoori 0.3 +
-    // 0.3 × 0.62 + 0.4 × 0.14 = 0.542; Paneer 0.3 + 0 + 0.4 × 0.25 =
-    // 0.4; Italian pasta 0 + 0.3 + 0 = 0.3. Biryani is over an hour.
+    // Scores (cuisine 0.2, protein 0.4, cost 0.4): Dal 0.2 + 0.4 × 0.03 +
+    // 0.4 × 1 = 0.611; Tandoori 0.2 + 0.4 × 0.62 + 0.4 × 0.14 = 0.504;
+    // Italian pasta 0 + 0.4 × 1 + 0 = 0.4; Paneer 0.2 + 0 + 0.4 × 0.25 =
+    // 0.3. Biryani is over an hour.
     expect(result.top.map((r) => [r.recipe.title, r.score])).toEqual([
-      ["Dal", 0.708],
-      ["Tandoori chicken and rice", 0.542],
-      ["Paneer rice bowl", 0.4],
+      ["Dal", 0.611],
+      ["Tandoori chicken and rice", 0.504],
+      ["Chicken pasta", 0.4],
     ]);
     expect(result.top[1].recipe).toMatchObject({
       kcal: 430,
@@ -210,8 +211,8 @@ describe("findTopRecipes", () => {
 
     expect(after.top.map((r) => r.recipe.title)).toEqual([
       "Dal",
-      "Paneer rice bowl",
       "Chicken pasta",
+      "Paneer rice bowl",
     ]);
     // Stored recipes aren't fetched again; only the skipped pages are.
     expect(first.readPage.mock.calls.length - pagesRead).toBe(2);
@@ -224,7 +225,7 @@ describe("findTopRecipes", () => {
       search: vi.fn(async (q: string, _count?: number, page = 0) =>
         Array.from(
           { length: 20 },
-          (_, i) => `https://${q.split(" ")[0]}.test/${page * 20 + i}`,
+          (_, i) => `https://${q.split(" ")[2]}.test/${page * 20 + i}`,
         ),
       ),
     };
@@ -243,12 +244,12 @@ describe("findTopRecipes", () => {
 
     // A full first page is enough, so no search asks for page 2.
     expect(brave.search.mock.calls.map((c) => c[0])).toEqual([
-      "Indian greek yogurt snack recipe",
-      "Indian egg snack recipe",
-      "Indian cottage cheese snack recipe",
-      "Thai greek yogurt snack recipe",
-      "Thai egg snack recipe",
-      "Thai cottage cheese snack recipe",
+      "high protein Indian greek yogurt snack recipe",
+      "high protein Indian egg snack recipe",
+      "high protein Indian cottage cheese snack recipe",
+      "high protein Thai greek yogurt snack recipe",
+      "high protein Thai egg snack recipe",
+      "high protein Thai cottage cheese snack recipe",
     ]);
     expect(brave.search.mock.calls.every((c) => c[2] === 0)).toBe(true);
     // A pause before all but the first search.
@@ -342,7 +343,7 @@ describe("findTopRecipes", () => {
     expect(result.top.map((r) => r.recipe.title)).toEqual(["Dal"]);
     expect(result.skipped).toEqual([
       {
-        url: "search: Indian chicken dinner recipe",
+        url: "search: high protein Indian chicken dinner recipe",
         reason: "Brave search failed: 429 Too Many Requests",
       },
     ]);
@@ -385,13 +386,13 @@ describe("searchQuery", () => {
 
   it("searches each of the week's proteins, with or without a cuisine", () => {
     expect(searchQueries("lunch")).toEqual([
-      "chicken dinner recipe",
-      "lentil dinner recipe",
-      "black bean dinner recipe",
+      "high protein chicken dinner recipe",
+      "high protein lentil dinner recipe",
+      "high protein black bean dinner recipe",
     ]);
     expect(searchQueries("dinner", ["Thai"], "2026-11-01")).toEqual(
       weekProteins("dinner", "2026-11-01").map(
-        (p) => `Thai ${p} dinner recipe`,
+        (p) => `high protein Thai ${p} dinner recipe`,
       ),
     );
   });
@@ -418,12 +419,12 @@ describe("simple-recipe searches", () => {
         cheap: true,
       }),
     ).toEqual([
-      "cheap easy few ingredient Mexican chicken dinner recipe",
-      "Mexican chicken dinner recipe",
-      "cheap easy few ingredient Mexican lentil dinner recipe",
-      "Mexican lentil dinner recipe",
-      "cheap easy few ingredient Mexican black bean dinner recipe",
-      "Mexican black bean dinner recipe",
+      "high protein cheap easy few ingredient Mexican chicken dinner recipe",
+      "high protein Mexican chicken dinner recipe",
+      "high protein cheap easy few ingredient Mexican lentil dinner recipe",
+      "high protein Mexican lentil dinner recipe",
+      "high protein cheap easy few ingredient Mexican black bean dinner recipe",
+      "high protein Mexican black bean dinner recipe",
     ]);
     expect(searchQueries("lunch", [], undefined, {})).toEqual(
       searchQueries("lunch"),
@@ -450,8 +451,8 @@ describe("simple-recipe searches", () => {
       ),
     ];
     expect(queries.slice(0, 2)).toEqual([
-      "cheap easy few ingredient Indian chicken dinner recipe",
-      "Indian chicken dinner recipe",
+      "high protein cheap easy few ingredient Indian chicken dinner recipe",
+      "high protein Indian chicken dinner recipe",
     ]);
     expect(queries).toHaveLength(6);
   });

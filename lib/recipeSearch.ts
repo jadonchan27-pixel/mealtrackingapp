@@ -97,6 +97,9 @@ export function simplePrefix({ maxIngredients, cheap }: SimpleSearch = {}):
   return [cheap && "cheap", "easy", few].filter(Boolean).join(" ");
 }
 
+// TR-32: every search asks for high-protein recipes (US-38).
+export const HIGH_PROTEIN = "high protein";
+
 // One search per cuisine (or one with none) and protein of the week; under
 // TR-28 each is preceded by its simple-recipe search.
 export function searchQueries(
@@ -107,11 +110,13 @@ export function searchQueries(
 ): string[] {
   const chosen = cuisines.length > 0 ? cuisines : [undefined];
   const proteins = weekProteins(slot, weekStart);
-  const prefix = simplePrefix(simple);
+  const simpler = simplePrefix(simple);
   return chosen.flatMap((c) =>
     proteins.flatMap((p) => [
-      ...(prefix ? [searchQuery(slot, c, p, prefix)] : []),
-      searchQuery(slot, c, p),
+      ...(simpler
+        ? [searchQuery(slot, c, p, `${HIGH_PROTEIN} ${simpler}`)]
+        : []),
+      searchQuery(slot, c, p, HIGH_PROTEIN),
     ]),
   );
 }
